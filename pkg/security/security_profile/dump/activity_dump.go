@@ -108,8 +108,7 @@ type ActivityDump struct {
 
 	countedByLimiter bool
 
-	shouldMergePaths bool
-	nodeStats        ActivityDumpNodeStats
+	nodeStats ActivityDumpNodeStats
 
 	// standard attributes used by the intake
 	Host    string   `json:"host,omitempty"`
@@ -198,7 +197,6 @@ func NewActivityDump(adm *ActivityDumpManager, options ...WithDumpOption) *Activ
 	ad.Host = adm.hostname
 	ad.Source = ActivityDumpSource
 	ad.adm = adm
-	ad.shouldMergePaths = adm.config.RuntimeSecurity.ActivityDumpPathMergeEnabled
 
 	// set load configuration to initial defaults
 	ad.LoadConfig = NewActivityDumpLoadConfig(
