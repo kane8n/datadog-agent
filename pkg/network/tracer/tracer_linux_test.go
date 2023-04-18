@@ -389,6 +389,7 @@ func TestConnectionExpirationRegression(t *testing.T) {
 
 func TestConntrackExpiration(t *testing.T) {
 	setupDNAT(t)
+	wg := sync.WaitGroup{}
 
 	tr := setupTracer(t, testConfig())
 
@@ -396,9 +397,13 @@ func TestConntrackExpiration(t *testing.T) {
 	// times can fail if binding to the same port since Conntrack might not emit NEW events for the same tuple
 	rand.Seed(time.Now().UnixNano())
 	port := 5430 + rand.Intn(100)
-	server := NewTCPServerOnAddress(fmt.Sprintf("1.1.1.1:%d", port), func(c net.Conn) {
-		io.Copy(io.Discard, c)
-		c.Close()
+	server := newTCPServerOnAddress(fmt.Sprintf("1.1.1.1:%d", port), func(c net.Conn) {
+		wg.Add(1)
+		defer wg.Done()
+		defer c.Close()
+
+		r := bufio.NewReader(c)
+		r.ReadBytes(byte('\n'))
 	})
 	t.Cleanup(server.Shutdown)
 	require.NoError(t, server.Run())
@@ -432,12 +437,18 @@ func TestConntrackExpiration(t *testing.T) {
 	_ = getConnections(t, tr)
 
 	assert.Nil(t, tr.conntracker.GetTranslationForConn(*conn), "translation should have been deleted")
+
+	// write newline so server connections will exit
+	_, err = c.Write([]byte("\n"))
+	require.NoError(t, err)
+	wg.Wait()
 }
 
 // This test ensures that conntrack lookups are retried for short-lived
 // connections when the first lookup fails
 func TestConntrackDelays(t *testing.T) {
 	setupDNAT(t)
+	wg := sync.WaitGroup{}
 
 	tr := setupTracer(t, testConfig())
 	// This will ensure that the first lookup for every connection fails, while the following ones succeed
@@ -447,9 +458,13 @@ func TestConntrackDelays(t *testing.T) {
 	// times can fail if binding to the same port since Conntrack might not emit NEW events for the same tuple
 	rand.Seed(time.Now().UnixNano())
 	port := 5430 + rand.Intn(100)
-	server := NewTCPServerOnAddress(fmt.Sprintf("1.1.1.1:%d", port), func(c net.Conn) {
-		io.Copy(io.Discard, c)
-		c.Close()
+	server := newTCPServerOnAddress(fmt.Sprintf("1.1.1.1:%d", port), func(c net.Conn) {
+		wg.Add(1)
+		defer wg.Done()
+		defer c.Close()
+
+		r := bufio.NewReader(c)
+		r.ReadBytes(byte('\n'))
 	})
 	t.Cleanup(server.Shutdown)
 	require.NoError(t, server.Run())
@@ -467,19 +482,29 @@ func TestConntrackDelays(t *testing.T) {
 	conn, ok := findConnection(c.LocalAddr(), c.RemoteAddr(), connections)
 	require.True(t, ok)
 	require.NotNil(t, tr.conntracker.GetTranslationForConn(*conn), "missing translation for connection")
+
+	// write newline so server connections will exit
+	_, err = c.Write([]byte("\n"))
+	require.NoError(t, err)
+	wg.Wait()
 }
 
 func TestTranslationBindingRegression(t *testing.T) {
 	setupDNAT(t)
+	wg := sync.WaitGroup{}
 
 	tr := setupTracer(t, testConfig())
 
 	// Setup TCP server
 	rand.Seed(time.Now().UnixNano())
 	port := 5430 + rand.Intn(100)
-	server := NewTCPServerOnAddress(fmt.Sprintf("1.1.1.1:%d", port), func(c net.Conn) {
-		io.Copy(io.Discard, c)
-		c.Close()
+	server := newTCPServerOnAddress(fmt.Sprintf("1.1.1.1:%d", port), func(c net.Conn) {
+		wg.Add(1)
+		defer wg.Done()
+		defer c.Close()
+
+		r := bufio.NewReader(c)
+		r.ReadBytes(byte('\n'))
 	})
 	t.Cleanup(server.Shutdown)
 	require.NoError(t, server.Run())
@@ -499,6 +524,11 @@ func TestTranslationBindingRegression(t *testing.T) {
 	conn, ok := findConnection(c.LocalAddr(), c.RemoteAddr(), connections)
 	require.True(t, ok)
 	require.NotNil(t, conn.IPTranslation, "missing translation for connection")
+
+	// write newline so server connections will exit
+	_, err = c.Write([]byte("\n"))
+	require.NoError(t, err)
+	wg.Wait()
 }
 
 func TestUnconnectedUDPSendIPv6(t *testing.T) {
