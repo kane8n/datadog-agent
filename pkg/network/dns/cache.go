@@ -176,7 +176,7 @@ func (c *reverseDNSCache) Stats() map[string]int64 {
 
 func (c *reverseDNSCache) Close() {
 	c.oversizedLogLimit.Close()
-	c.exit <- struct{}{}
+	close(c.exit)
 }
 
 func (c *reverseDNSCache) Expire(now time.Time) {
