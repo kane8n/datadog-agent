@@ -100,16 +100,18 @@ var Addr *net.TCPAddr = &net.TCPAddr{
 	Port: 25568,
 }
 
+const msgLen = 10000
+
 var (
 	isInSlowMode    = true
 	wg              sync.WaitGroup
 	serverReadyLock sync.Mutex
 	serverReadyCond = sync.NewCond(&serverReadyLock)
+	total           int
 )
 
 func handleRequest(conn *net.TCPConn) error {
-	defer wg.Done()
-	total := 0
+	defer conn.Close()
 outer:
 	for {
 		buf := make([]byte, 10)
@@ -131,7 +133,6 @@ outer:
 		}
 	}
 
-	conn.Close()
 	return nil
 }
 
@@ -145,7 +146,6 @@ func server() error {
 	serverReadyCond.Broadcast()
 
 	conn, err := listener.AcceptTCP()
-
 	if err != nil {
 		return err
 	}
@@ -155,9 +155,6 @@ func server() error {
 }
 
 func client() error {
-	defer wg.Done()
-	const msgLen = 10000
-
 	serverReadyCond.Wait()
 
 	conn, err := net.DialTCP("tcp", nil, Addr)
@@ -178,11 +175,13 @@ func client() error {
 	return nil
 }
 
-func runTCPLoadTest() {
+func runTCPLoadTest() error {
 	serverReadyLock.Lock()
+	defer serverReadyLock.Unlock()
+	total = 0
 
-	wg.Add(2)
-	go server()
-	go client()
-	wg.Wait()
+	g := new(errgroup.Group)
+	g.Go(server)
+	g.Go(client)
+	return g.Wait()
 }
