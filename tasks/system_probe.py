@@ -519,6 +519,7 @@ def test(
     windows=is_windows,
     failfast=False,
     kernel_release=None,
+    timeout="20m",
 ):
     """
     Run tests on eBPF parts
@@ -558,6 +559,7 @@ def test(
         "run": f"-run {run}" if run else "",
         "failfast": "-failfast" if failfast else "",
         "go": "go",
+        "timeout": f"-timeout {timeout}" if timeout else "",
     }
 
     _, _, env = get_build_flags(ctx)
@@ -575,7 +577,7 @@ def test(
     if go_root:
         args["go"] = os.path.join(go_root, "bin", "go")
 
-    cmd = '{go} test -mod=mod -v {failfast} -tags "{build_tags}" {output_params} {pkgs} {run}'
+    cmd = '{go} test -mod=mod -v {failfast} {timeout} -tags "{build_tags}" {output_params} {pkgs} {run}'
     if not windows and not output_path and not is_root():
         cmd = 'sudo -E ' + cmd
 
