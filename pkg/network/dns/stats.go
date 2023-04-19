@@ -262,5 +262,5 @@ func (d *dnsStatKeeper) removeExpiredStates(earliestTs time.Time) {
 }
 
 func (d *dnsStatKeeper) Close() {
-	d.exit <- struct{}{}
+	close(d.exit)
 }
