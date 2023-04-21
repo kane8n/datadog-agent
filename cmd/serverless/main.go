@@ -213,29 +213,15 @@ func runAgent(stopCh chan struct{}) (serverlessDaemon *daemon.Daemon, err error)
 	// Channels for ColdStartCreator
 	lambdaSpanChan := make(chan *pb.Span)
 	initDurationChan := make(chan float64)
-	coldStartSpanId := random.Random.Uint64()
+	coldStartSpanId := random.GenerateSpanId()
 	metricAgent := &metrics.ServerlessMetricAgent{}
 	metricAgent.Start(daemon.FlushTimeout, &metrics.MetricConfig{}, &metrics.MetricDogStatsD{})
 	serverlessDaemon.SetStatsdServer(metricAgent)
 	serverlessDaemon.SetupLogCollectionHandler(logsAPICollectionRoute, logChannel, config.Datadog.GetBool("serverless.logs_enabled"), config.Datadog.GetBool("enhanced_metrics"), initDurationChan)
 
-	coldStartSpanCreator := &trace.ColdStartSpanCreator{
-		LambdaSpanChan:   lambdaSpanChan,
-		InitDurationChan: initDurationChan,
-		TraceAgent:       serverlessDaemon.TraceAgent,
-		StopChan:         make(chan struct{}),
-		ColdStartSpanId:  coldStartSpanId,
-	}
-	spanFilters := []trace.SpanFilter{coldStartSpanCreator}
-
-	var otlpAgent *otlp.ServerlessOTLPAgent
+	var otelSpanChan chan *pb.Span
 	if otlp.IsEnabled() {
-		log.Debug("enabling otlp endpoint")
-		otlpAgent = otlp.NewServerlessOTLPAgent(
-			serverlessDaemon.ExecutionContext, metricAgent.Demux.Serializer())
-		otlpAgent.Start()
-		serverlessDaemon.SetOTLPAgent(otlpAgent)
-		spanFilters = append(spanFilters, otlpAgent)
+		otelSpanChan = make(chan *pb.Span)
 	}
 
 	// Concurrently start heavyweight features
@@ -246,8 +232,23 @@ func runAgent(stopCh chan struct{}) (serverlessDaemon *daemon.Daemon, err error)
 	go func() {
 		defer wg.Done()
 		traceAgent := &trace.ServerlessTraceAgent{}
-		traceAgent.Start(config.Datadog.GetBool("apm_config.enabled"), &trace.LoadConfig{Path: datadogConfigPath}, coldStartSpanId, spanFilters...)
+		traceAgent.Start(config.Datadog.GetBool("apm_config.enabled"), &trace.LoadConfig{Path: datadogConfigPath}, otelSpanChan, lambdaSpanChan, coldStartSpanId)
 		serverlessDaemon.SetTraceAgent(traceAgent)
+	}()
+
+	// starts otlp agent
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if !otlp.IsEnabled() {
+			log.Debug("otlp endpoint disabled")
+			return
+		}
+		log.Debug("enabling otlp endpoint")
+		otlpAgent := otlp.NewServerlessOTLPAgent(
+			metricAgent.Demux.Serializer(), serverlessDaemon.ExecutionContext, otelSpanChan)
+		otlpAgent.Start()
+		serverlessDaemon.SetOTLPAgent(otlpAgent)
 	}()
 
 	// enable telemetry collection
@@ -301,6 +302,14 @@ func runAgent(stopCh chan struct{}) (serverlessDaemon *daemon.Daemon, err error)
 
 	wg.Wait()
 
+	coldStartSpanCreator := &trace.ColdStartSpanCreator{
+		LambdaSpanChan:   lambdaSpanChan,
+		InitDurationChan: initDurationChan,
+		TraceAgent:       serverlessDaemon.TraceAgent,
+		StopChan:         make(chan struct{}),
+		ColdStartSpanId:  coldStartSpanId,
+	}
+
 	log.Debug("Starting ColdStartSpanCreator")
 	coldStartSpanCreator.Run()
 	log.Debug("Setting ColdStartSpanCreator on Daemon")
@@ -323,8 +332,8 @@ func runAgent(stopCh chan struct{}) (serverlessDaemon *daemon.Daemon, err error)
 		OTLPEnabled:          otlp.IsEnabled(),
 	}
 
-	if otlpAgent != nil {
-		otlpAgent.ProcessTrace = ta.Process
+	if o := serverlessDaemon.OTLPAgent; o != nil {
+		o.ProcessTrace = ta.Process
 	}
 
 	if appsecProxyProcessor != nil {

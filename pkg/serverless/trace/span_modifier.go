@@ -6,6 +6,7 @@
 package trace
 
 import (
+	"github.com/DataDog/datadog-agent/pkg/serverless/random"
 	"github.com/DataDog/datadog-agent/pkg/serverless/trace/inferredspan"
 	"github.com/DataDog/datadog-agent/pkg/trace/pb"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
@@ -17,12 +18,9 @@ const (
 
 type spanModifier struct {
 	tags            map[string]string
+	otelSpanChan    chan<- *pb.Span
+	lambdaSpanChan  chan<- *pb.Span
 	coldStartSpanId uint64
-	filters         []SpanFilter
-}
-
-type SpanFilter interface {
-	Filter(pb.Span)
 }
 
 // ModifySpan applies extra logic to the given span
@@ -31,6 +29,9 @@ func (s *spanModifier) ModifySpan(_ *pb.TraceChunk, span *pb.Span) {
 		// service name could be incorrectly set to 'aws.lambda' in datadog lambda libraries
 		if s.tags["service"] != "" {
 			span.Service = s.tags["service"]
+		}
+		if s.lambdaSpanChan != nil && span.Name != "aws.lambda.cold_start" {
+			s.lambdaSpanChan <- span
 		}
 	}
 
@@ -49,9 +50,12 @@ func (s *spanModifier) ModifySpan(_ *pb.TraceChunk, span *pb.Span) {
 		}
 	}
 
-	for _, filter := range s.filters {
-		// pass the actual span rather than its pointer to enforce the
-		// requirement that filters do not modify spans
-		filter.Filter(*span)
+	if s.otelSpanChan != nil {
+		// TODO: Infinite loop??
+		if span.ParentID == 0 && span.Name != "aws.lambda" {
+			spanID := random.GenerateSpanId()
+			span.ParentID = spanID
+			s.otelSpanChan <- span
+		}
 	}
 }

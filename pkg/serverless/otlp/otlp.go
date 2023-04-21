@@ -20,25 +20,26 @@ import (
 	coreOtlp "github.com/DataDog/datadog-agent/pkg/otlp"
 	"github.com/DataDog/datadog-agent/pkg/serializer"
 	"github.com/DataDog/datadog-agent/pkg/serverless/executioncontext"
-	"github.com/DataDog/datadog-agent/pkg/serverless/random"
 	"github.com/DataDog/datadog-agent/pkg/trace/api"
 	"github.com/DataDog/datadog-agent/pkg/trace/info"
 	"github.com/DataDog/datadog-agent/pkg/trace/pb"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
-const functionNameEnvVar = "AWS_LAMBDA_FUNCTION_NAME"
-
 // ServerlessOTLPAgent represents an OTLP agent in a serverless context
 type ServerlessOTLPAgent struct {
-	pipeline         *coreOtlp.Pipeline
+	pipeline *coreOtlp.Pipeline
+
+	// TODO
 	executionContext *executioncontext.ExecutionContext
 	ProcessTrace     func(p *api.Payload)
+	otelSpanChan     <-chan *pb.Span
+	stop             chan struct{}
 }
 
 // NewServerlessOTLPAgent creates a new ServerlessOTLPAgent with the correct
 // otel pipeline.
-func NewServerlessOTLPAgent(executionContext *executioncontext.ExecutionContext, serializer serializer.MetricSerializer) *ServerlessOTLPAgent {
+func NewServerlessOTLPAgent(serializer serializer.MetricSerializer, executionContext *executioncontext.ExecutionContext, otelSpanChan <-chan *pb.Span) *ServerlessOTLPAgent {
 	pipeline, err := coreOtlp.NewPipelineFromAgentConfig(config.Datadog, serializer)
 	if err != nil {
 		log.Error("Error creating new otlp pipeline:", err)
@@ -57,6 +58,10 @@ func (o *ServerlessOTLPAgent) Start() {
 			log.Errorf("Error running the OTLP pipeline: %s", err)
 		}
 	}()
+	if o.otelSpanChan != nil {
+		o.stop = make(chan struct{})
+		go o.createRootSpans()
+	}
 }
 
 // Stop stops the OTLP agent.
@@ -67,6 +72,9 @@ func (o *ServerlessOTLPAgent) Stop() {
 	o.pipeline.Stop()
 	if err := o.waitForState(collectorStateClosed, time.Second); err != nil {
 		log.Error("Error stopping OTLP endpints:", err)
+	}
+	if o.otelSpanChan != nil {
+		close(o.stop)
 	}
 }
 
@@ -106,34 +114,53 @@ func (o *ServerlessOTLPAgent) waitForState(state string, timeout time.Duration) 
 	}
 }
 
-func (o *ServerlessOTLPAgent) Filter(span pb.Span) {
-	if span.ParentID == 0 {
-		log.Debug("opentelemetry root span received, creating aws.lambda execution span")
+var functionName = os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
 
-		span.Service = "aws.lambda" // will be replaced by the span processor
-		span.Name = "aws.lambda"
-		span.Type = "serverless"
-		span.Resource = os.Getenv(functionNameEnvVar)
-		span.SpanID = random.GenerateTraceId()
-		span.Meta = map[string]string{
-			"_dd.origin": "lambda",
-			"request_id": span.Meta["faas.execution"],
+func (o *ServerlessOTLPAgent) createRootSpans() {
+	for {
+		select {
+		case span := <-o.otelSpanChan:
+			o.createRootSpan(span)
+		case <-o.stop:
+			return
 		}
-
-		if o.executionContext != nil {
-			ec := o.executionContext.GetCurrentState()
-			span.Start = ec.StartTime.UnixNano()
-			span.Meta["cold_start"] = fmt.Sprintf("%v", ec.Coldstart)
-		}
-
-		go o.ProcessTrace(&api.Payload{
-			Source: info.NewReceiverStats().GetTagStats(info.Tags{}),
-			TracerPayload: &pb.TracerPayload{
-				Chunks: []*pb.TraceChunk{&pb.TraceChunk{
-					Priority: 1,
-					Spans:    []*pb.Span{&span},
-				}},
-			},
-		})
 	}
+}
+
+func (o *ServerlessOTLPAgent) createRootSpan(otelSpan *pb.Span) {
+	log.Debug("opentelemetry root span received, creating aws.lambda execution span")
+	if o.ProcessTrace == nil {
+		log.Error("cannot process new aws.lambda span, dropping")
+		return
+	}
+
+	span := &pb.Span{
+		Service:  "aws.lambda", // will be replaced by the span processor
+		Name:     "aws.lambda",
+		Resource: functionName,
+		TraceID:  otelSpan.TraceID,
+		SpanID:   otelSpan.ParentID,
+		Start:    otelSpan.Start,
+		Duration: otelSpan.Duration,
+		Meta: map[string]string{
+			"_dd.origin": "lambda",
+			"request_id": otelSpan.Meta["faas.execution"],
+		},
+		Type: "serverless",
+	}
+
+	if o.executionContext != nil {
+		ec := o.executionContext.GetCurrentState()
+		span.Meta["cold_start"] = fmt.Sprintf("%v", ec.Coldstart)
+	}
+
+	go o.ProcessTrace(&api.Payload{
+		Source: info.NewReceiverStats().GetTagStats(info.Tags{}),
+		TracerPayload: &pb.TracerPayload{
+			Chunks: []*pb.TraceChunk{&pb.TraceChunk{
+				Priority: 1,
+				Spans:    []*pb.Span{span},
+			}},
+		},
+	})
 }
