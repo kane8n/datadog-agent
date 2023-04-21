@@ -426,8 +426,8 @@ func (c *CWSConsumer) RuleMatch(rule *rules.Rule, event eval.Event) {
 	ev := event.(*model.Event)
 
 	// ensure that all the fields are resolved before sending
-	ev.FieldHandlers.ResolveContainerID(ev, &ev.ContainerContext)
-	ev.FieldHandlers.ResolveContainerTags(ev, &ev.ContainerContext)
+	ev.FieldHandlers.ResolveContainerID(ev, ev.ContainerContext)
+	ev.FieldHandlers.ResolveContainerTags(ev, ev.ContainerContext)
 
 	if ev.ContainerContext.ID != "" && c.config.ActivityDumpTagRulesEnabled {
 		ev.Rules = append(ev.Rules, model.NewMatchedRule(rule.Definition.ID, rule.Definition.Version, rule.Definition.Tags, rule.Definition.Policy.Name, rule.Definition.Policy.Version))

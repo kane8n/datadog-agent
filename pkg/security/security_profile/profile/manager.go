@@ -515,8 +515,8 @@ func (m *SecurityProfileManager) LookupEventOnProfiles(event *model.Event) {
 		return
 	}
 
-	event.FieldHandlers.ResolveContainerID(event, &event.ContainerContext)
-	event.FieldHandlers.ResolveContainerTags(event, &event.ContainerContext)
+	event.FieldHandlers.ResolveContainerID(event, event.ContainerContext)
+	event.FieldHandlers.ResolveContainerTags(event, event.ContainerContext)
 	if event.ContainerContext.ID == "" || len(event.ContainerContext.Tags) == 0 {
 		return
 	}

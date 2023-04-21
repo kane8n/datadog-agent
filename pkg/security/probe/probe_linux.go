@@ -415,7 +415,7 @@ func (p *Probe) EventMarshallerCtor(event *model.Event) func() easyjson.Marshale
 }
 
 func (p *Probe) unmarshalContexts(data []byte, event *model.Event) (int, error) {
-	read, err := model.UnmarshalBinary(data, &event.PIDContext, &event.SpanContext, &event.ContainerContext)
+	read, err := model.UnmarshalBinary(data, &event.PIDContext, &event.SpanContext, event.ContainerContext)
 	if err != nil {
 		return 0, err
 	}
@@ -675,7 +675,7 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 			return
 		}
 
-		if err = p.resolvers.ProcessResolver.ResolveNewProcessCacheEntry(event.ProcessCacheEntry, &event.ContainerContext); err != nil {
+		if err = p.resolvers.ProcessResolver.ResolveNewProcessCacheEntry(event.ProcessCacheEntry, event.ContainerContext); err != nil {
 			seclog.Debugf("failed to resolve new process cache entry context: %s", err)
 
 			var errResolution *path.ErrPathResolution
@@ -841,6 +841,9 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 
 	// resolve the process cache entry
 	event.ProcessCacheEntry, _ = p.fieldHandlers.ResolveProcessCacheEntry(event)
+
+	// resolve the container context
+	event.ContainerContext, _ = p.fieldHandlers.ResolveContainerContext(event)
 
 	// use ProcessCacheEntry process context as process context
 	event.ProcessContext = &event.ProcessCacheEntry.ProcessContext
@@ -1180,7 +1183,8 @@ func (p *Probe) NewRuleSet(eventTypeEnabled map[eval.EventType]bool) *rules.Rule
 
 	eventCtor := func() eval.Event {
 		return &model.Event{
-			FieldHandlers: p.fieldHandlers,
+			FieldHandlers:    p.fieldHandlers,
+			ContainerContext: &model.ContainerContext{},
 		}
 	}
 
@@ -1255,7 +1259,7 @@ func (p *Probe) handleNewMount(ev *model.Event, m *model.Mount) error {
 	}
 
 	// Insert new mount point in cache, passing it a copy of the mount that we got from the event
-	if err := p.resolvers.MountResolver.Insert(*m, ev.PIDContext.Pid, ev.FieldHandlers.ResolveContainerID(ev, &ev.ContainerContext)); err != nil {
+	if err := p.resolvers.MountResolver.Insert(*m, ev.PIDContext.Pid, ev.FieldHandlers.ResolveContainerID(ev, ev.ContainerContext)); err != nil {
 		seclog.Errorf("failed to insert mount event: %v", err)
 		return err
 	}
@@ -1330,8 +1334,7 @@ func NewProbe(config *config.Config, opts Opts) (*Probe, error) {
 		cancelFnc:            cancel,
 		StatsdClient:         opts.StatsdClient,
 		discarderRateLimiter: rate.NewLimiter(rate.Every(time.Second/5), 100),
-
-		event: &model.Event{},
+		event:                &model.Event{ContainerContext: &model.ContainerContext{}},
 		PlatformProbe: PlatformProbe{
 			approvers:            make(map[eval.EventType]kfilters.ActiveApprovers),
 			managerOptions:       ebpf.NewDefaultOptions(),

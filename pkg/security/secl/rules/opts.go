@@ -69,6 +69,11 @@ func NewEvalOpts(eventTypeEnabled map[eval.EventType]bool) (*Opts, *eval.Opts) {
 					return ctx.Event.(*model.Event).ProcessCacheEntry
 				})
 			},
+			"container": func() VariableProvider {
+				return eval.NewScopedVariables(func(ctx *eval.Context) *model.ContainerContext {
+					return ctx.Event.(*model.Event).ContainerContext
+				})
+			},
 		})
 
 	var evalOpts eval.Opts
