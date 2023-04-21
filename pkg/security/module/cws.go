@@ -89,7 +89,7 @@ func NewCWSConsumer(evm *eventmonitor.EventMonitor, config *config.RuntimeSecuri
 		currentRuleSet: new(atomic.Value),
 		reloading:      atomic.NewBool(false),
 		apiServer:      NewAPIServer(config, evm.Probe, evm.StatsdClient),
-		rateLimiter:    NewRateLimiter(evm.StatsdClient),
+		rateLimiter:    NewRateLimiter(config, evm.StatsdClient),
 		sigupChan:      make(chan os.Signal, 1),
 		selfTester:     selfTester,
 		policyMonitor:  NewPolicyMonitor(evm.StatsdClient),
