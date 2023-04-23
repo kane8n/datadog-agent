@@ -70,6 +70,8 @@ extern "C" {
 
 int init_stringutils(void);
 char *as_string(PyObject *);
+char *attr_as_string(PyObject *object, const char *attributeName);
+long attr_as_long(PyObject *object, const char *attributeName);
 PyObject *from_yaml(const char *);
 char *as_yaml(PyObject *);
 

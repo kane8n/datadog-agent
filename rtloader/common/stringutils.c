@@ -72,6 +72,51 @@ char *as_string(PyObject *object)
     return retval;
 }
 
+char* attr_as_string(PyObject* object, const char* attributeName)
+{
+    if (object == NULL) {
+        return NULL;
+    }
+
+    char* value = NULL;
+    PyObject* py_attr = NULL;
+
+    py_attr = PyObject_GetAttrString(object, attributeName);
+    if (py_attr != NULL && PyUnicode_Check(py_attr)) {
+        value = as_string(py_attr);
+    }
+    else if (py_attr != NULL && !PyUnicode_Check(py_attr)) {
+        PyErr_Clear();
+    }
+    else {
+        PyErr_Clear();
+    }
+
+    Py_XDECREF(py_attr);
+
+    return value;
+}
+
+long attr_as_long(PyObject* object, const char* attributeName)
+{
+    if (object == NULL) {
+        return -1;
+    }
+
+    long value = -1;
+    PyObject* py_attr = NULL;
+
+    py_attr = PyObject_GetAttrString(object, attributeName);
+    if (py_attr != NULL) {
+        value = PyLong_AsLong(py_attr);
+    }
+
+    Py_XDECREF(py_attr);
+
+    return value;
+}
+
+
 int init_stringutils(void) {
     PyObject *yaml = NULL;
     int ret = EXIT_FAILURE;

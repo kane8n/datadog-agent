@@ -244,3 +244,10 @@ func SetPythonPsutilProcPath(procPath string) error {
 	C.set_module_attr_string(rtloader, module, attrName, attrValue)
 	return getRtLoaderError()
 }
+
+func convertAndFreeCString(cgoStr *C.char, goStr *string) {
+	if cgoStr != nil {
+		*goStr = C.GoString(cgoStr)
+		C.rtloader_free(rtloader, unsafe.Pointer(cgoStr))
+	}
+}

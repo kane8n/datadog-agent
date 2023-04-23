@@ -15,13 +15,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRunAll(t *testing.T) {
+func TestConnectivityAutodiscovery(t *testing.T) {
 
-	diagnosis.Register("failing", func() error { return errors.New("fail") })
-	diagnosis.Register("succeeding", func() error { return nil })
+	diagnosis.RegisterMetadataAvail("failing", func() error { return errors.New("fail") })
+	diagnosis.RegisterMetadataAvail("succeeding", func() error { return nil })
 
 	w := &bytes.Buffer{}
-	RunAll(w)
+	RunMetadataAvail(w)
 
 	result := w.String()
 	assert.Contains(t, result, "=== Running failing diagnosis ===\n===> FAIL")

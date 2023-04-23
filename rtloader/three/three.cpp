@@ -520,6 +520,7 @@ char **Three::getCheckWarnings(RtLoaderPyObject *check)
         if (warn == NULL) {
             setError("there was an error browsing 'warnings' list: " + _fetchPythonError());
 
+            // Is this a bug? ---> if warnings[jdx] != NULL and jdx > idx (uninitialized memory)
             for (int jdx = 0; jdx < numWarnings && warnings[jdx]; jdx++) {
                 _free(warnings[jdx]);
             }
@@ -534,6 +535,107 @@ char **Three::getCheckWarnings(RtLoaderPyObject *check)
 done:
     Py_XDECREF(warns_list);
     return warnings;
+}
+
+//
+// getCheckDiagnoses()
+//     Get array of diagnoses_t pointers which type contains mostly string pointers.
+//     Note: array size is implied because the last entry will be NULL. Thus return
+//     result object layout is very simple to create and parse but it is very slow
+//     to  manage (allocate and free). If there are N diagnoses to return this code
+//     will trigger minimum, depending if optional fields are not nil at least 3N+1
+//     and at most 7N+1 malloc() and free() calls which are relatively expensive.
+//     Much better efficiency could be achieved by packing all the data into a single
+//     buffer which we may do in the next release.
+//
+//     Corresponding parsing routine which would have to be changed is
+//       func (c *PythonCheck) GetDiagnoses() ([]diagnosis.Diagnosis, error)
+//     located at datadog-agent\\pkg\\collector\\python\\check.go
+//
+diagnosis_t **Three::getCheckDiagnoses(RtLoaderPyObject *check)
+{
+    if (check == NULL) {
+        return NULL;
+    }
+
+    PyObject *py_check = reinterpret_cast<PyObject *>(check);
+    diagnosis_t **diagnoses = NULL;
+    size_t arraySize = 0;
+
+    char func_name[] = "get_diagnoses";
+    Py_ssize_t numDiagnoses;
+
+    PyObject *diagnoses_list = PyObject_CallMethod(py_check, func_name, NULL);
+    if (diagnoses_list == NULL) {
+        goto done;
+    }
+
+    numDiagnoses = PyList_Size(diagnoses_list);
+    // docs are not clear but `PyList_Size` can actually fail and in case it would
+    // return -1, see https://github.com/python/cpython/blob/3.8/Objects/listobject.c#L223
+    if (numDiagnoses == -1) {
+        setError("error computing 'len(diagnoses)': " + _fetchPythonError());
+        goto done;
+    }
+
+    if (numDiagnoses == 0) {
+        goto done;
+    }
+
+    arraySize = sizeof(diagnosis_t) * (numDiagnoses + 1);
+    diagnoses = (diagnosis_t **)_malloc(arraySize);
+    if (!diagnoses) {
+        setError("could not allocate memory to store diagnoses");
+        goto done;
+    }
+    memset(diagnoses, 0, arraySize);
+
+    for (Py_ssize_t idx = 0; idx < numDiagnoses; idx++) {
+        PyObject *diagnosis = PyList_GetItem(diagnoses_list, idx); // borrowed ref
+        if (diagnosis == NULL) {
+            setError("there was an error browsing 'diagnoses' list: " + _fetchPythonError());
+            goto error;
+        }
+
+        diagnosis_t *diagnosisC = (diagnosis_t *)_malloc(sizeof(diagnosis_t));
+        if (diagnosisC == NULL) {
+            setError("could not allocate memory to store diagnoses");
+            goto error;
+        }
+        memset(diagnosisC, 0, sizeof(diagnosis_t));
+        diagnoses[idx] = diagnosisC;
+
+        diagnosisC->result = (DiagnosisResult)attr_as_long(diagnosis, "result");
+        diagnosisC->name = attr_as_string(diagnosis, "name");
+        diagnosisC->diagnosis = attr_as_string(diagnosis, "diagnosis");
+        diagnosisC->category = attr_as_string(diagnosis, "category");
+        diagnosisC->description = attr_as_string(diagnosis, "description");
+        diagnosisC->remediation = attr_as_string(diagnosis, "remediation");
+        diagnosisC->raw_error = attr_as_string(diagnosis, "raw_error");
+    }
+
+    goto done;
+
+error:
+    for (int jdx = 0; jdx < numDiagnoses; jdx++) {
+        diagnosis_t *diagnosisC = diagnoses[jdx];
+        if (diagnosisC != NULL) {
+            _free(diagnosisC->name);
+            _free(diagnosisC->diagnosis);
+            _free(diagnosisC->category);
+            _free(diagnosisC->description);
+            _free(diagnosisC->remediation);
+            _free(diagnosisC->raw_error);
+            _free(diagnosisC);
+        }
+    }
+    _free(diagnoses);
+
+    diagnoses = NULL;
+
+done:
+    Py_XDECREF(diagnoses_list);
+    return diagnoses;
 }
 
 // return new reference

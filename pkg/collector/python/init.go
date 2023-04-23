@@ -45,6 +45,10 @@ char *getStringAddr(char **array, unsigned int idx) {
 	return array[idx];
 }
 
+diagnosis_t *getDiagnosisAddr(diagnosis_t **array, unsigned int idx) {
+	return array[idx];
+}
+
 //
 // init memory tracking facilities method
 //
