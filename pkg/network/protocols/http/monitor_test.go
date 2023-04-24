@@ -163,6 +163,7 @@ func TestHTTPMonitorIntegrationWithResponseBody(t *testing.T) {
 			srvDoneFn := testutil.HTTPServer(t, serverAddr, testutil.Options{
 				EnableKeepAlives: true,
 			})
+			t.Cleanup(srvDoneFn)
 
 			requestFn := requestGenerator(t, targetAddr, bytes.Repeat([]byte("a"), tt.requestBodySize))
 			var requests []*nethttp.Request
@@ -222,6 +223,7 @@ func TestHTTPMonitorIntegrationSlowResponse(t *testing.T) {
 				ReadTimeout:  serverTimeout,
 				SlowResponse: slowResponseTimeout,
 			})
+			t.Cleanup(srvDoneFn)
 
 			// Perform a number of random requests
 			req := requestGenerator(t, targetAddr, emptyBody)()
@@ -286,7 +288,7 @@ func TestUnknownMethodRegression(t *testing.T) {
 		EnableTLS:        false,
 		EnableKeepAlives: true,
 	})
-	defer srvDoneFn()
+	t.Cleanup(srvDoneFn)
 
 	requestFn := requestGenerator(t, targetAddr, emptyBody)
 	for i := 0; i < 100; i++ {
@@ -310,7 +312,7 @@ func TestRSTPacketRegression(t *testing.T) {
 	srvDoneFn := testutil.HTTPServer(t, serverAddr, testutil.Options{
 		EnableKeepAlives: true,
 	})
-	defer srvDoneFn()
+	t.Cleanup(srvDoneFn)
 
 	// Create a "raw" TCP socket that will serve as our HTTP client
 	// We do this in order to configure the socket option SO_LINGER
@@ -430,6 +432,7 @@ func testHTTPMonitor(t *testing.T, targetAddr, serverAddr string, numReqs int, o
 	monitor := newHTTPMonitor(t)
 
 	srvDoneFn := testutil.HTTPServer(t, serverAddr, o)
+	t.Cleanup(srvDoneFn)
 
 	// Perform a number of random requests
 	requestFn := requestGenerator(t, targetAddr, emptyBody)
@@ -565,7 +568,7 @@ func newHTTPMonitor(t *testing.T) *Monitor {
 	require.NoError(t, err)
 	t.Cleanup(monitor.Stop)
 
-	// at this stage the test can be legitimally skipped due to missing BTF information
+	// at this stage the test can be legitimately skipped due to missing BTF information
 	// in the context of CO-RE
 	err = monitor.Start()
 	skipIfNotSupported(t, err)
