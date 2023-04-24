@@ -28,8 +28,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"golang.org/x/sys/unix"
 
+	"github.com/DataDog/datadog-agent/pkg/ebpf/ebpftest"
 	"github.com/DataDog/datadog-agent/pkg/network"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	javatestutil "github.com/DataDog/datadog-agent/pkg/network/java/testutil"
@@ -43,13 +45,10 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/connection/kprobe"
 	tracertestutil "github.com/DataDog/datadog-agent/pkg/network/tracer/testutil"
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/testutil/grpc"
-	"github.com/DataDog/datadog-agent/pkg/util/kernel"
 )
 
 func httpSupported(t *testing.T) bool {
-	currKernelVersion, err := kernel.HostVersion()
-	require.NoError(t, err)
-	return currKernelVersion >= http.MinimumKernelVersion
+	return kv >= http.MinimumKernelVersion
 }
 
 func httpsSupported(t *testing.T) bool {
@@ -73,7 +72,18 @@ func isTLSTag(staticTags uint64) bool {
 	return staticTags&network.ConnTagTLS > 0
 }
 
-func TestEnableHTTPMonitoring(t *testing.T) {
+type USMSuite struct {
+	suite.Suite
+}
+
+func TestUSMSuite(t *testing.T) {
+	ebpftest.TestBuildModes(t, []ebpftest.BuildMode{ebpftest.Prebuilt, ebpftest.RuntimeCompiled, ebpftest.CORE}, "", func(t *testing.T) {
+		suite.Run(t, new(USMSuite))
+	})
+}
+
+func (s *USMSuite) TestEnableHTTPMonitoring() {
+	t := s.T()
 	if !httpSupported(t) {
 		t.Skip("HTTP monitoring not supported")
 	}
@@ -83,7 +93,8 @@ func TestEnableHTTPMonitoring(t *testing.T) {
 	_ = setupTracer(t, cfg)
 }
 
-func TestHTTPStats(t *testing.T) {
+func (s *USMSuite) TestHTTPStats() {
+	t := s.T()
 	t.Run("status code", func(t *testing.T) {
 		testHTTPStats(t, true)
 	})
@@ -145,7 +156,8 @@ func testHTTPStats(t *testing.T, aggregateByStatusCode bool) {
 	}, 3*time.Second, 10*time.Millisecond, "couldn't find http connection matching: %s", serverAddr)
 }
 
-func TestHTTPSViaLibraryIntegration(t *testing.T) {
+func (s *USMSuite) TestHTTPSViaLibraryIntegration() {
+	t := s.T()
 	if !httpSupported(t) {
 		t.Skip("HTTPS feature not available on pre 4.14.0 kernels")
 	}
@@ -283,7 +295,8 @@ const (
 )
 
 // TestOpenSSLVersions setups a HTTPs python server, and makes sure we are able to capture all traffic.
-func TestOpenSSLVersions(t *testing.T) {
+func (s *USMSuite) TestOpenSSLVersions() {
+	t := s.T()
 	if !httpSupported(t) {
 		t.Skip("HTTPS feature not available on pre 4.14.0 kernels")
 	}
@@ -347,7 +360,8 @@ func TestOpenSSLVersions(t *testing.T) {
 // Unfortunately, this is only a best-effort mechanism and it relies on some assumptions that are not always necessarily true
 // such as having SSL_read/SSL_write calls in the same call-stack/execution-context as the kernel function tcp_sendmsg. Force
 // this is reason the fallback behavior may require a few warmup requests before we start capturing traffic.
-func TestOpenSSLVersionsSlowStart(t *testing.T) {
+func (s *USMSuite) TestOpenSSLVersionsSlowStart() {
+	t := s.T()
 	if !httpsSupported(t) {
 		t.Skip("HTTPS feature not available/supported for this setup")
 	}
@@ -473,7 +487,8 @@ func isRequestIncluded(allStats map[http.Key]*http.RequestStats, req *nethttp.Re
 	return false
 }
 
-func TestProtocolClassification(t *testing.T) {
+func (s *USMSuite) TestProtocolClassification() {
+	t := s.T()
 	cfg := testConfig()
 	if !classificationSupported(cfg) {
 		t.Skip("Classification is not supported")
@@ -531,7 +546,7 @@ func testProtocolClassificationMapCleanup(t *testing.T, tr *Tracer, clientHost, 
 		initTracerState(t, tr)
 		require.NoError(t, tr.ebpfTracer.Resume())
 
-		HTTPServer := NewTCPServerOnAddress(serverHost, func(c net.Conn) {
+		HTTPServer := newTCPServerOnAddress(serverHost, func(c net.Conn) {
 			r := bufio.NewReader(c)
 			input, err := r.ReadBytes(byte('\n'))
 			if err == nil {
@@ -586,7 +601,8 @@ func createJavaTempFile(t *testing.T, dir string) string {
 	return tempfile.Name()
 }
 
-func TestJavaInjection(t *testing.T) {
+func (s *USMSuite) TestJavaInjection() {
+	t := s.T()
 	if !javaTLSSupported(t) {
 		t.Skip("java TLS not supported on the current platform")
 	}
@@ -810,83 +826,36 @@ func TestJavaInjection(t *testing.T) {
 	}
 }
 
-// GoTLS test
 func TestHTTPGoTLSAttachProbes(t *testing.T) {
-	if !goTLSSupported(t) {
-		t.Skip("GoTLS not supported for this setup")
-	}
+	modes := []ebpftest.BuildMode{ebpftest.RuntimeCompiled}
+	ebpftest.TestBuildModes(t, modes, "", func(t *testing.T) {
+		if !goTLSSupported(t) {
+			t.Skip("GoTLS not supported for this setup")
+		}
 
-	t.Run("new process (runtime compilation)", func(t *testing.T) {
-		cfg := testConfig()
-		cfg.EnableRuntimeCompiler = true
-		cfg.EnableCORE = false
-		testHTTPGoTLSCaptureNewProcess(t, cfg)
-	})
-
-	t.Run("already running process (runtime compilation)", func(t *testing.T) {
-		cfg := testConfig()
-		cfg.EnableRuntimeCompiler = true
-		cfg.EnableCORE = false
-		testHTTPGoTLSCaptureAlreadyRunning(t, cfg)
-	})
-
-	// note: this is a bit of hack since CI runs an entire package either as
-	// runtime, CO-RE, or pre-built. here we're piggybacking on the runtime pass
-	// and running the CO-RE tests as well
-	t.Run("new process (co-re)", func(t *testing.T) {
-		cfg := testConfig()
-		cfg.EnableCORE = true
-		cfg.EnableRuntimeCompiler = false
-		cfg.AllowRuntimeCompiledFallback = false
-		testHTTPGoTLSCaptureNewProcess(t, cfg)
-	})
-
-	t.Run("already running process (co-re)", func(t *testing.T) {
-		cfg := testConfig()
-		cfg.EnableCORE = true
-		cfg.EnableRuntimeCompiler = false
-		cfg.AllowRuntimeCompiledFallback = false
-		testHTTPGoTLSCaptureAlreadyRunning(t, cfg)
+		t.Run("new process", func(t *testing.T) {
+			testHTTPGoTLSCaptureNewProcess(t, config.New())
+		})
+		t.Run("already running process", func(t *testing.T) {
+			testHTTPGoTLSCaptureAlreadyRunning(t, config.New())
+		})
 	})
 }
 
 func TestHTTPSGoTLSAttachProbesOnContainer(t *testing.T) {
 	t.Skip("Skipping a flaky test")
-	if !goTLSSupported(t) {
-		t.Skip("GoTLS not supported for this setup")
-	}
+	modes := []ebpftest.BuildMode{ebpftest.RuntimeCompiled}
+	ebpftest.TestBuildModes(t, modes, "", func(t *testing.T) {
+		if !goTLSSupported(t) {
+			t.Skip("GoTLS not supported for this setup")
+		}
 
-	t.Run("new process (runtime compilation)", func(t *testing.T) {
-		cfg := config.New()
-		cfg.EnableRuntimeCompiler = true
-		cfg.EnableCORE = false
-		testHTTPsGoTLSCaptureNewProcessContainer(t, cfg)
-	})
-
-	t.Run("already running process (runtime compilation)", func(t *testing.T) {
-		cfg := config.New()
-		cfg.EnableRuntimeCompiler = true
-		cfg.EnableCORE = false
-		testHTTPsGoTLSCaptureAlreadyRunningContainer(t, cfg)
-	})
-
-	// note: this is a bit of hack since CI runs an entire package either as
-	// runtime, CO-RE, or pre-built. here we're piggybacking on the runtime pass
-	// and running the CO-RE tests as well
-	t.Run("new process (co-re)", func(t *testing.T) {
-		cfg := config.New()
-		cfg.EnableCORE = true
-		cfg.EnableRuntimeCompiler = false
-		cfg.AllowRuntimeCompiledFallback = false
-		testHTTPsGoTLSCaptureNewProcessContainer(t, cfg)
-	})
-
-	t.Run("already running process (co-re)", func(t *testing.T) {
-		cfg := config.New()
-		cfg.EnableCORE = true
-		cfg.EnableRuntimeCompiler = false
-		cfg.AllowRuntimeCompiledFallback = false
-		testHTTPsGoTLSCaptureAlreadyRunningContainer(t, cfg)
+		t.Run("new process", func(t *testing.T) {
+			testHTTPsGoTLSCaptureNewProcessContainer(t, config.New())
+		})
+		t.Run("already running process", func(t *testing.T) {
+			testHTTPsGoTLSCaptureAlreadyRunningContainer(t, config.New())
+		})
 	})
 }
 
@@ -1034,7 +1003,8 @@ type tlsTestCommand struct {
 }
 
 // TLS classification tests
-func TestTLSClassification(t *testing.T) {
+func (s *USMSuite) TestTLSClassification() {
+	t := s.T()
 	cfg := testConfig()
 	cfg.ProtocolClassificationEnabled = true
 	cfg.CollectTCPConns = true

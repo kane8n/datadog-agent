@@ -18,21 +18,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/kversion"
+
+	"github.com/DataDog/datadog-agent/pkg/ebpf/ebpftest"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	"github.com/DataDog/datadog-agent/pkg/network/protocols/http/testutil"
 	"github.com/DataDog/datadog-agent/pkg/network/protocols/kafka"
 	"github.com/DataDog/datadog-agent/pkg/util/kernel"
-	"github.com/stretchr/testify/require"
-	"github.com/twmb/franz-go/pkg/kgo"
-	"github.com/twmb/franz-go/pkg/kversion"
-)
-
-type BinaryType int
-
-const (
-	PREBUILT = 0
-	RUNTIME  = 1
-	CORE     = 2
 )
 
 const (
@@ -83,6 +77,10 @@ func skipTestIfKernelNotSupported(t *testing.T) {
 }
 
 func TestKafkaProtocolParsing(t *testing.T) {
+	ebpftest.TestBuildModes(t, []ebpftest.BuildMode{ebpftest.Prebuilt, ebpftest.RuntimeCompiled, ebpftest.CORE}, "", testKafkaProtocolParsing)
+}
+
+func testKafkaProtocolParsing(t *testing.T) {
 	skipTestIfKernelNotSupported(t)
 
 	clientHost := "localhost"
@@ -101,11 +99,12 @@ func TestKafkaProtocolParsing(t *testing.T) {
 		if _, ok := ctx.extras["client"]; !ok {
 			return
 		}
-		client := ctx.extras["client"].(*kafka.Client)
-		defer client.Client.Close()
-		for k, value := range ctx.extras {
-			if strings.HasPrefix(k, "topic_name") {
-				_ = client.DeleteTopic(value.(string))
+		if client, ok := ctx.extras["client"].(*kafka.Client); ok {
+			defer client.Client.Close()
+			for k, value := range ctx.extras {
+				if strings.HasPrefix(k, "topic_name") {
+					_ = client.DeleteTopic(value.(string))
+				}
 			}
 		}
 	}
@@ -460,33 +459,22 @@ func newHTTPWithKafkaMonitor(t *testing.T, cfg *config.Config) *Monitor {
 func TestLoadKafkaBinary(t *testing.T) {
 	skipTestIfKernelNotSupported(t)
 
-	for mode, debug := range map[string]bool{"debug": true, "release": false} {
-		for runType, val := range map[string]BinaryType{"CORE": CORE, "RUNTIME": RUNTIME, "PREBUILT": PREBUILT} {
-			t.Run(fmt.Sprintf("%s %s binary", runType, mode), func(t *testing.T) {
-				loadKafkaBinary(t, debug, val)
-			})
-		}
-	}
+	ebpftest.TestBuildModes(t, []ebpftest.BuildMode{ebpftest.Prebuilt, ebpftest.RuntimeCompiled, ebpftest.CORE}, "", func(t *testing.T) {
+		t.Run("debug", func(t *testing.T) {
+			loadKafkaBinary(t, true)
+		})
+		t.Run("release", func(t *testing.T) {
+			loadKafkaBinary(t, false)
+		})
+	})
 }
 
-func loadKafkaBinary(t *testing.T, debug bool, binaryType BinaryType) {
+func loadKafkaBinary(t *testing.T, debug bool) {
 	cfg := config.New()
 	// We don't have a way of enabling kafka without http at the moment
 	cfg.EnableHTTPMonitoring = true
 	cfg.EnableKafkaMonitoring = true
 	cfg.BPFDebug = debug
-
-	cfg.AllowPrecompiledFallback = false
-	cfg.AllowRuntimeCompiledFallback = false
-	cfg.EnableCORE = false
-	switch binaryType {
-	case PREBUILT:
-		cfg.AllowPrecompiledFallback = true
-	case RUNTIME:
-		cfg.AllowRuntimeCompiledFallback = true
-	case CORE:
-		cfg.EnableCORE = true
-	}
 
 	newHTTPWithKafkaMonitor(t, cfg)
 }

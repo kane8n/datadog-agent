@@ -9,21 +9,6 @@ tests_dir = ::File.join(root_dir, "tests")
 
 GOLANG_TEST_FAILURE = /FAIL:/
 
-skip_prebuilt_tests = Array.[](
-  "pkg/collector/corechecks/ebpf/probe"
-)
-
-runtime_compiled_tests = Array.[](
-  "pkg/network/tracer",
-  "pkg/network/protocols/http",
-  "pkg/collector/corechecks/ebpf/probe"
-)
-
-co_re_tests = Array.[](
-  "pkg/collector/corechecks/ebpf/probe",
-  "pkg/network/protocols/http"
-)
-
 TIMEOUTS = {
   "pkg/network/protocols" => "5m",
   # disable timeouts for pkg/network/tracer
@@ -73,9 +58,11 @@ Dir.glob("#{tests_dir}/pkg/ebpf/bytecode/build/co-re/*.o").each do |f|
   FileUtils.chmod 0644, f, :verbose => true
 end
 
-shared_examples "passes" do |bundle, env, filter, filter_inclusive|
-  after :context do
-    print KernelOut.format(`find "/tmp/pkgjson/#{bundle}" -maxdepth 1 -type f -path "*.json" -exec cat >"/tmp/testjson/#{bundle}.json" {} +`)
+describe "system-probe" do
+  after :all do
+    print KernelOut.format(`find "/tmp/pkgjson" -maxdepth 1 -type f -path "*.json" -exec cat >"/tmp/testjson/out.json" {} +`)
+    print KernelOut.format(`tar -C /tmp/junit -czf /tmp/junit.tar.gz .`)
+    print KernelOut.format(`tar -C /tmp/testjson -czf /tmp/testjson.tar.gz .`)
   end
 
   Dir.glob("#{tests_dir}/**/testsuite").sort.each do |f|
@@ -91,12 +78,12 @@ shared_examples "passes" do |bundle, env, filter, filter_inclusive|
 
     it "#{pkg} tests" do |ex|
       Dir.chdir(File.dirname(f)) do
-        xmlpath = "/tmp/junit/#{bundle}/#{junitfile}"
+        xmlpath = "/tmp/junit/#{junitfile}"
         cmd = ["sudo", "-E",
           "/go/bin/gotestsum",
           "--format", "dots",
           "--junitfile", xmlpath,
-          "--jsonfile", "/tmp/pkgjson/#{bundle}/#{pkg.gsub("/","-")}.json",
+          "--jsonfile", "/tmp/pkgjson/#{pkg.gsub("/","-")}.json",
           "--raw-command", "--",
           "/go/bin/test2json", "-t", "-p", pkg, f, "-test.v", "-test.count=1", "-test.timeout=#{get_timeout(pkg)}"
         ]
@@ -110,7 +97,6 @@ shared_examples "passes" do |bundle, env, filter, filter_inclusive|
 
         xmldoc = REXML::Document.new(File.read(xmlpath))
         REXML::XPath.each(xmldoc, "//testsuites/testsuite/properties") do |props|
-          props.add_element("property", { "name" => "dd_tags[test.bundle]", "value" => bundle })
           props.add_element("property", { "name" => "dd_tags[os.platform]", "value" => platform })
           props.add_element("property", { "name" => "dd_tags[os.name]", "value" => osname })
           props.add_element("property", { "name" => "dd_tags[os.architecture]", "value" => arch })
@@ -120,52 +106,6 @@ shared_examples "passes" do |bundle, env, filter, filter_inclusive|
           xmldoc.write(:output => f, :indent => 4)
         end
       end
-    end
-  end
-end
-
-describe "system-probe" do
-  after :all do
-    print KernelOut.format(`tar -C /tmp/junit -czf /tmp/junit.tar.gz .`)
-    print KernelOut.format(`tar -C /tmp/testjson -czf /tmp/testjson.tar.gz .`)
-  end
-
-  context "prebuilt" do
-    env = {
-      "DD_ENABLE_RUNTIME_COMPILER"=>"false",
-      "DD_ENABLE_CO_RE"=>"false"
-    }
-    include_examples "passes", "prebuilt", env, skip_prebuilt_tests, false
-  end
-
-  context "runtime compiled" do
-    env = {
-      "DD_ENABLE_RUNTIME_COMPILER"=>"true",
-      "DD_ALLOW_PRECOMPILED_FALLBACK"=>"false",
-      "DD_ENABLE_CO_RE"=>"false"
-    }
-    include_examples "passes", "runtime", env, runtime_compiled_tests, true
-  end
-
-  context "CO-RE" do
-    env = {
-      "DD_ENABLE_CO_RE"=>"true",
-      "DD_ENABLE_RUNTIME_COMPILER"=>"false",
-      "DD_ALLOW_RUNTIME_COMPILED_FALLBACK"=>"false",
-      "DD_ALLOW_PRECOMPILED_FALLBACK"=>"false"
-    }
-    include_examples "passes", "co-re", env, co_re_tests, true
-  end
-
-  context "fentry" do
-    env = {
-      "NETWORK_TRACER_FENTRY_TESTS"=>"true",
-      "DD_ENABLE_CO_RE"=>"true",
-      "DD_ENABLE_RUNTIME_COMPILER"=>"false",
-      "DD_ALLOW_RUNTIME_COMPILED_FALLBACK"=>"false"
-    }
-    if osname == "amzn-2" and arch == "x86_64" and release.start_with?("5.10.")
-      include_examples "passes", "fentry", env, skip_prebuilt_tests, false
     end
   end
 end

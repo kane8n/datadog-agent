@@ -13,12 +13,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/DataDog/datadog-agent/pkg/ebpf/ebpftest"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 )
 
 func TestConntrackCompile(t *testing.T) {
-	cfg := config.New()
-	cfg.BPFDebug = true
-	_, err := getRuntimeCompiledConntracker(cfg)
-	require.NoError(t, err)
+	ebpftest.TestBuildMode(t, ebpftest.RuntimeCompiled, "", func(t *testing.T) {
+		cfg := config.New()
+		cfg.BPFDebug = true
+		_, err := getRuntimeCompiledConntracker(cfg)
+		require.NoError(t, err)
+	})
 }

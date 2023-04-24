@@ -13,18 +13,21 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/DataDog/datadog-agent/pkg/ebpf/ebpftest"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	"github.com/DataDog/datadog-agent/pkg/util/kernel"
 )
 
 func TestHttpCompile(t *testing.T) {
-	if !rtcHTTPSupported(t) {
-		t.Skip("HTTP Runtime compilation not supported on this kernel version")
-	}
-	cfg := config.New()
-	cfg.BPFDebug = true
-	_, err := getRuntimeCompiledHTTP(cfg)
-	require.NoError(t, err)
+	ebpftest.TestBuildMode(t, ebpftest.RuntimeCompiled, "", func(t *testing.T) {
+		if !rtcHTTPSupported(t) {
+			t.Skip("HTTP Runtime compilation not supported on this kernel version")
+		}
+		cfg := config.New()
+		cfg.BPFDebug = true
+		_, err := getRuntimeCompiledHTTP(cfg)
+		require.NoError(t, err)
+	})
 }
 
 func rtcHTTPSupported(t *testing.T) bool {

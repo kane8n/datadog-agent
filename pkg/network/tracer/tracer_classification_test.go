@@ -437,9 +437,10 @@ func testMySQLProtocolClassification(t *testing.T, tr *Tracer, clientHost, targe
 	}
 
 	mysqlTeardown := func(t *testing.T, ctx testContext) {
-		client := ctx.extras["conn"].(*mysql.Client)
-		defer client.DB.Close()
-		client.DropDB()
+		if client, ok := ctx.extras["conn"].(*mysql.Client); ok {
+			defer client.DB.Close()
+			client.DropDB()
+		}
 	}
 
 	serverAddress := net.JoinHostPort(serverHost, mysqlPort)
@@ -1531,7 +1532,7 @@ func testEdgeCasesProtocolClassification(t *testing.T, tr *Tracer, clientHost, t
 				extras:        map[string]interface{}{},
 			},
 			preTracerSetup: func(t *testing.T, ctx testContext) {
-				server := NewTCPServerOnAddress(ctx.serverAddress, func(c net.Conn) {
+				server := newTCPServerOnAddress(ctx.serverAddress, func(c net.Conn) {
 					c.Close()
 				})
 				ctx.extras["server"] = server
@@ -1556,7 +1557,7 @@ func testEdgeCasesProtocolClassification(t *testing.T, tr *Tracer, clientHost, t
 				extras:        map[string]interface{}{},
 			},
 			preTracerSetup: func(t *testing.T, ctx testContext) {
-				server := NewTCPServerOnAddress(ctx.serverAddress, func(c net.Conn) {
+				server := newTCPServerOnAddress(ctx.serverAddress, func(c net.Conn) {
 					defer c.Close()
 					r := bufio.NewReader(c)
 					input, err := r.ReadBytes(byte('\n'))
@@ -1590,7 +1591,7 @@ func testEdgeCasesProtocolClassification(t *testing.T, tr *Tracer, clientHost, t
 				extras:        map[string]interface{}{},
 			},
 			preTracerSetup: func(t *testing.T, ctx testContext) {
-				server := NewTCPServerOnAddress(ctx.serverAddress, func(c net.Conn) {
+				server := newTCPServerOnAddress(ctx.serverAddress, func(c net.Conn) {
 					defer c.Close()
 
 					r := bufio.NewReader(c)

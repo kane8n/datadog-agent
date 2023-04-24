@@ -24,15 +24,28 @@ import (
 	manager "github.com/DataDog/ebpf-manager"
 	"github.com/cilium/ebpf"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"golang.org/x/sys/unix"
 
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
+	"github.com/DataDog/datadog-agent/pkg/ebpf/ebpftest"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	netebpf "github.com/DataDog/datadog-agent/pkg/network/ebpf"
 	errtelemetry "github.com/DataDog/datadog-agent/pkg/network/telemetry"
 )
 
-func TestSharedLibraryDetection(t *testing.T) {
+type SharedLibrarySuite struct {
+	suite.Suite
+}
+
+func TestSharedLibrary(t *testing.T) {
+	ebpftest.TestBuildModes(t, []ebpftest.BuildMode{ebpftest.Prebuilt, ebpftest.RuntimeCompiled, ebpftest.CORE}, "", func(t *testing.T) {
+		suite.Run(t, new(SharedLibrarySuite))
+	})
+}
+
+func (s *SharedLibrarySuite) TestSharedLibraryDetection() {
+	t := s.T()
 	perfHandler, doneFn := initEBPFProgram(t)
 	t.Cleanup(doneFn)
 	fpath := filepath.Join(t.TempDir(), "foo.so")
@@ -71,7 +84,8 @@ func TestSharedLibraryDetection(t *testing.T) {
 	require.Equal(t, fpath, pathDetected)
 }
 
-func TestSharedLibraryDetectionWithPIDandRootNameSpace(t *testing.T) {
+func (s *SharedLibrarySuite) TestSharedLibraryDetectionWithPIDandRootNameSpace() {
+	t := s.T()
 	_, err := os.Stat("/usr/bin/busybox")
 	if err != nil {
 		t.Skip("skip for the moment as some distro are not friendly with busybox package")
@@ -132,7 +146,8 @@ func TestSharedLibraryDetectionWithPIDandRootNameSpace(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestSameInodeRegression(t *testing.T) {
+func (s *SharedLibrarySuite) TestSameInodeRegression() {
+	t := s.T()
 	perfHandler, doneFn := initEBPFProgram(t)
 	t.Cleanup(doneFn)
 	fpath1 := filepath.Join(t.TempDir(), "a-foo.so")

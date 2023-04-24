@@ -257,11 +257,9 @@ func newConntracker(cfg *config.Config, bpfTelemetry *telemetry.EBPFTelemetry, c
 		return c, nil
 	}
 
-	if !cfg.EnableRuntimeCompiler || cfg.AllowPrecompiledFallback {
-		log.Warnf("error initializing ebpf conntracker, falling back to netlink version: %s", err)
-		if c, err = netlink.NewConntracker(cfg); err == nil {
-			return c, nil
-		}
+	log.Warnf("error initializing ebpf conntracker, falling back to netlink version: %s", err)
+	if c, err = netlink.NewConntracker(cfg); err == nil {
+		return c, nil
 	}
 
 	if cfg.IgnoreConntrackInitFailure {

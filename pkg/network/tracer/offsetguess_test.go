@@ -20,13 +20,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 
+	manager "github.com/DataDog/ebpf-manager"
+
 	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode/runtime"
+	"github.com/DataDog/datadog-agent/pkg/ebpf/ebpftest"
 	netebpf "github.com/DataDog/datadog-agent/pkg/network/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/connection/kprobe"
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/offsetguess"
 	"github.com/DataDog/datadog-agent/pkg/process/statsd"
 	"github.com/DataDog/datadog-agent/pkg/util/kernel"
-	manager "github.com/DataDog/ebpf-manager"
 )
 
 //go:generate go run ../../../pkg/ebpf/include_headers.go ../../../pkg/network/ebpf/c/runtime/offsetguess-test.c ../../../pkg/ebpf/bytecode/build/runtime/offsetguess-test.c ../../../pkg/ebpf/c ../../../pkg/ebpf/c/protocols ../../../pkg/network/ebpf/c/runtime ../../../pkg/network/ebpf/c
@@ -127,11 +129,11 @@ func (o offsetT) String() string {
 }
 
 func TestOffsetGuess(t *testing.T) {
-	cfg := testConfig()
-	if !cfg.EnableRuntimeCompiler {
-		t.Skip("runtime compilation is not enabled")
-	}
+	ebpftest.TestBuildMode(t, ebpftest.RuntimeCompiled, "", testOffsetGuess)
+}
 
+func testOffsetGuess(t *testing.T) {
+	cfg := testConfig()
 	offsetBuf, err := netebpf.ReadOffsetBPFModule(cfg.BPFDir, cfg.BPFDebug)
 	require.NoError(t, err, "could not read offset bpf module")
 	t.Cleanup(func() { offsetBuf.Close() })
@@ -242,7 +244,7 @@ func TestOffsetGuess(t *testing.T) {
 	require.NoError(t, mgr.Start())
 	t.Cleanup(func() { mgr.Stop(manager.CleanAll) })
 
-	server := NewTCPServer(func(c net.Conn) {})
+	server := newTCPServer(func(c net.Conn) {})
 	require.NoError(t, server.Run())
 	t.Cleanup(func() { server.Shutdown() })
 

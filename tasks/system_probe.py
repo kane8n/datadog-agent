@@ -1419,7 +1419,6 @@ def print_failed_tests(_, output_dir):
                 tgz.extractall(path=unpack_dir)
 
             for test_json in glob.glob(f"{unpack_dir}/*.json"):
-                bundle, _ = os.path.splitext(os.path.basename(test_json))
                 with open(test_json) as tf:
                     for line in tf:
                         json_test = json.loads(line.strip())
@@ -1429,7 +1428,7 @@ def print_failed_tests(_, output_dir):
                             action = json_test["Action"]
 
                             if action == "fail":
-                                print(f"FAIL: [{test_platform}] [{bundle}] {package} {name}")
+                                print(f"FAIL: [{test_platform}] {package} {name}")
                                 fail_count += 1
 
     if fail_count > 0:

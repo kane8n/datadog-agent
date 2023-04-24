@@ -11,10 +11,12 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"github.com/DataDog/datadog-agent/pkg/util/kernel"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/DataDog/datadog-agent/pkg/ebpf/ebpftest"
+	"github.com/DataDog/datadog-agent/pkg/util/kernel"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
@@ -29,6 +31,10 @@ const (
 )
 
 func TestGRPCScenarios(t *testing.T) {
+	ebpftest.TestBuildModes(t, []ebpftest.BuildMode{ebpftest.Prebuilt, ebpftest.RuntimeCompiled, ebpftest.CORE}, "", testGRPCScenarios)
+}
+
+func testGRPCScenarios(t *testing.T) {
 	cfg := config.New()
 	cfg.EnableHTTPMonitoring = true
 	cfg.EnableHTTP2Monitoring = true
