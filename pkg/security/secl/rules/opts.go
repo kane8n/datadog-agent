@@ -70,7 +70,7 @@ func NewEvalOpts(eventTypeEnabled map[eval.EventType]bool) (*Opts, *eval.Opts) {
 				})
 			},
 			"container": func() VariableProvider {
-				return eval.NewScopedVariables(func(ctx *eval.Context) *model.ContainerContext {
+				return eval.NewScopedVariables(func(ctx *eval.Context) eval.ScopedVariable {
 					return ctx.Event.(*model.Event).ContainerContext
 				})
 			},
