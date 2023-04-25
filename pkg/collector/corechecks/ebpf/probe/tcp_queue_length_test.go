@@ -109,7 +109,6 @@ const msgLen = 10000
 
 var (
 	isInSlowMode    = true
-	wg              sync.WaitGroup
 	serverReadyLock sync.Mutex
 	serverReadyCond = sync.NewCond(&serverReadyLock)
 	total           int

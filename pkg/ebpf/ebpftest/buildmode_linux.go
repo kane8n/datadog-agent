@@ -9,13 +9,17 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/DataDog/gopsutil/host"
+
 	"github.com/DataDog/datadog-agent/pkg/util/kernel"
 )
 
+var hostinfo *host.InfoStat
 var kv kernel.Version
 
 func init() {
 	kv, _ = kernel.HostVersion()
+	hostinfo, _ = host.Info()
 }
 
 func SupportedBuildModes() []BuildMode {

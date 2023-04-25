@@ -7,8 +7,6 @@ package ebpftest
 
 import (
 	"fmt"
-
-	"github.com/DataDog/gopsutil/host"
 )
 
 // TODO I don't love fentry as a buildmode here...
@@ -19,15 +17,11 @@ var (
 	Fentry          BuildMode
 )
 
-var hostinfo *host.InfoStat
-
 func init() {
 	Prebuilt = prebuilt{}
 	RuntimeCompiled = runtimeCompiled{}
 	CORE = core{}
 	Fentry = fentry{}
-
-	hostinfo, _ = host.Info()
 }
 
 type BuildMode interface {
