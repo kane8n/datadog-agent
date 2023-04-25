@@ -8,6 +8,7 @@ package network
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -789,13 +790,33 @@ func (ns *networkState) determineConnectionIntraHost(connections []ConnectionSta
 		_type        ConnectionType
 	}
 
+	sort.Slice(connections, func(i, j int) bool {
+		c := connections[i].Source.Compare(connections[j].Source.Addr)
+		if c < 0 {
+			return true
+		}
+		if c > 0 {
+			return false
+		}
+		if connections[i].SPort < connections[j].SPort {
+			return true
+		}
+		if connections[i].SPort > connections[j].SPort {
+			return false
+		}
+		if connections[i].Type < connections[j].Type {
+			return true
+		}
+		if connections[i].Type > connections[j].Type {
+			return false
+		}
+		// equal
+		return false
+	})
+
 	dnats := make(map[dnatKey]struct{}, len(connections)/2)
-	lAddrs := make(map[connKey]struct{}, len(connections))
 	for i := range connections {
 		conn := &connections[i]
-		k := newConnKey(conn, false)
-		lAddrs[k] = struct{}{}
-
 		if isDNAT(conn) {
 			dnats[dnatKey{
 				src:   conn.Source,
@@ -816,7 +837,28 @@ func (ns *networkState) determineConnectionIntraHost(connections []ConnectionSta
 			conn.IntraHost = true
 		} else {
 			keyWithRAddr := newConnKey(conn, true)
-			_, conn.IntraHost = lAddrs[keyWithRAddr]
+			_, conn.IntraHost = sort.Find(len(connections), func(j int) int {
+				c := keyWithRAddr.Address.Compare(connections[j].Source.Addr)
+				if c < 0 {
+					return -1
+				}
+				if c > 0 {
+					return 1
+				}
+				if keyWithRAddr.Port < connections[j].SPort {
+					return -1
+				}
+				if keyWithRAddr.Port > connections[j].SPort {
+					return 1
+				}
+				if keyWithRAddr.Type < connections[j].Type {
+					return -1
+				}
+				if keyWithRAddr.Type > connections[j].Type {
+					return 1
+				}
+				return 0
+			})
 		}
 
 		if conn.IntraHost &&

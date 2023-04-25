@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sort"
 	"sync"
 	"syscall"
 	"testing"
@@ -1745,6 +1746,34 @@ func TestDetermineConnectionIntraHost(t *testing.T) {
 		},
 	}
 
+	// determineConnectionIntraHost will sort the connections
+	// array that is passed in, so sort the test array
+	// the same way here. This will allow us to compare
+	// the expected intrahost value at the end of the test
+	sort.Slice(tests, func(i, j int) bool {
+		c := tests[i].conn.Source.Compare(tests[j].conn.Source.Addr)
+		if c < 0 {
+			return true
+		}
+		if c > 0 {
+			return false
+		}
+		if tests[i].conn.SPort < tests[j].conn.SPort {
+			return true
+		}
+		if tests[i].conn.SPort > tests[j].conn.SPort {
+			return false
+		}
+		if tests[i].conn.Type < tests[j].conn.Type {
+			return true
+		}
+		if tests[i].conn.Type > tests[j].conn.Type {
+			return false
+		}
+		// equal
+		return false
+	})
+
 	conns := make([]ConnectionStats, 0, len(tests))
 	for _, te := range tests {
 		conns = append(conns, te.conn)
@@ -1752,19 +1781,22 @@ func TestDetermineConnectionIntraHost(t *testing.T) {
 	state := newDefaultState()
 	state.determineConnectionIntraHost(conns)
 	for i, te := range tests {
-		if i >= len(conns) {
-			assert.Failf(t, "missing connection for %s", te.name)
-			continue
-		}
-		c := conns[i]
-		assert.Equal(t, te.intraHost, c.IntraHost, "name: %s, conn: %+v", te.name, c)
-		if c.Direction == INCOMING {
-			if c.IntraHost {
-				assert.Nil(t, c.IPTranslation, "name: %s, conn: %+v", te.name, c)
-			} else {
-				assert.NotNil(t, c.IPTranslation, "name: %s, conn: %+v", te.name, c)
+		t.Run(te.name, func(t *testing.T) {
+			if i >= len(conns) {
+				assert.Fail(t, "missing connection")
+				return
 			}
-		}
+			c := conns[i]
+			assert.Equal(t, te.intraHost, c.IntraHost, "conn: %+v", c)
+			if c.Direction == INCOMING {
+				if c.IntraHost {
+					assert.Nil(t, c.IPTranslation, "conn: %+v", c)
+				} else {
+					assert.NotNil(t, c.IPTranslation, "conn: %+v", c)
+				}
+			}
+
+		})
 	}
 }
 
