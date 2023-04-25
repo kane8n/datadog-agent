@@ -33,3 +33,9 @@ func (wp *WindowsPipeListener) GetListener() net.Listener {
 func (wp *WindowsPipeListener) Stop() {
 	wp.conn.Close()
 }
+
+// HttpServe is equivalent to http.Serve()
+// allowedUsrID, allowedGrpID are unused, as windows doesn't support credential
+func HttpServe(l net.Listener, handler http.Handler, allowedUsrID int, allowedGrpID int) error {
+	return http.Serve(l, handler)
+}
