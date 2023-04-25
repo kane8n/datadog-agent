@@ -67,9 +67,7 @@ describe "system-probe" do
 
   Dir.glob("#{tests_dir}/**/testsuite").sort.each do |f|
     pkg = f.delete_prefix("#{tests_dir}/").delete_suffix('/testsuite')
-    next unless (filter_inclusive and filter.include? pkg) or (!filter_inclusive and !filter.include? pkg)
-
-    base_env = {
+    final_env = {
       "DD_SYSTEM_PROBE_BPF_DIR"=>"#{tests_dir}/pkg/ebpf/bytecode/build",
       "DD_SYSTEM_PROBE_JAVA_DIR"=>"#{tests_dir}/pkg/network/java",
       "GOVERSION"=>"unknown"
@@ -88,7 +86,6 @@ describe "system-probe" do
           "/go/bin/test2json", "-t", "-p", pkg, f, "-test.v", "-test.count=1", "-test.timeout=#{get_timeout(pkg)}"
         ]
 
-        final_env = base_env.merge(env)
         Open3.popen2e(final_env, *cmd) do |_, output, wait_thr|
           output.each_line do |line|
             puts KernelOut.format(line.strip)
