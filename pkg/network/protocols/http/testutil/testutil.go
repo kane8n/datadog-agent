@@ -33,6 +33,22 @@ type Options struct {
 	SlowResponse       time.Duration
 }
 
+func getNetIPV4TCPTimestamp(t *testing.T) bool {
+	oldTCPTS, err := sysctl.Get("net.ipv4.tcp_timestamps")
+	if err != nil {
+		t.Fatal("can't get TCP timestamp", err)
+	}
+	return oldTCPTS == "1"
+}
+
+func setNetIPV4TCPTimestamp(t *testing.T, enable bool) error {
+	tcpTimestampStr := "0"
+	if enable {
+		tcpTimestampStr = "1"
+	}
+	return sysctl.Set("net.ipv4.tcp_timestamps", tcpTimestampStr)
+}
+
 // HTTPServer spins up a HTTP test server that returns the status code included in the URL
 // Example:
 // * GET /200/foo returns a 200 status code;
@@ -52,18 +68,8 @@ func HTTPServer(t *testing.T, addr string, options Options) func() {
 	}
 
 	/* Save and recover TCP timestamp option */
-	oldTCPTS, err := sysctl.Get("net.ipv4.tcp_timestamps")
-	if err != nil {
-		t.Fatal("can't get TCP timestamp", err)
-	}
-	tcpTimestampStr := "0"
-	if options.EnableTCPTimestamp {
-		tcpTimestampStr = "1"
-	}
-	err = sysctl.Set("net.ipv4.tcp_timestamps", tcpTimestampStr)
-	if err != nil {
-		t.Fatal("can't set TCP timestamp", err)
-	}
+	oldTCPTS := getNetIPV4TCPTimestamp(t)
+	setNetIPV4TCPTimestamp(t, options.EnableTCPTimestamp)
 
 	srv := &http.Server{
 		Addr:         addr,
@@ -101,16 +107,13 @@ func HTTPServer(t *testing.T, addr string, options Options) func() {
 			return err
 		}
 	}
-	err = listenFn()
-	if err != nil {
+
+	if err := listenFn(); err != nil {
 		t.Fatalf("server listen: %s", err)
 	}
 	return func() {
 		srv.Shutdown(context.Background())
-		err := sysctl.Set("net.ipv4.tcp_timestamps", oldTCPTS)
-		if err != nil {
-			t.Fatal("can't set old value of TCP timestamp", err)
-		}
+		setNetIPV4TCPTimestamp(t, oldTCPTS)
 	}
 }
 
