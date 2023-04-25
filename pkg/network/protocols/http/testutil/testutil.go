@@ -27,7 +27,7 @@ import (
 type Options struct {
 	EnableTLS          bool
 	EnableKeepAlives   bool
-	EnableTCPTimestamp bool
+	EnableTCPTimestamp *bool
 	ReadTimeout        time.Duration
 	WriteTimeout       time.Duration
 	SlowResponse       time.Duration
@@ -78,8 +78,11 @@ func HTTPServer(t *testing.T, addr string, options Options) func() {
 	}
 
 	/* Save and recover TCP timestamp option */
-	oldTCPTS := getNetIPV4TCPTimestamp(t)
-	setNetIPV4TCPTimestamp(t, options.EnableTCPTimestamp)
+	oldTCPTS := false
+	if options.EnableTCPTimestamp != nil {
+		oldTCPTS = getNetIPV4TCPTimestamp(t)
+		setNetIPV4TCPTimestamp(t, *options.EnableTCPTimestamp)
+	}
 
 	srv := &http.Server{
 		Addr:         addr,
@@ -123,7 +126,9 @@ func HTTPServer(t *testing.T, addr string, options Options) func() {
 	}
 	return func() {
 		srv.Shutdown(context.Background())
-		setNetIPV4TCPTimestamp(t, oldTCPTS)
+		if options.EnableTCPTimestamp != nil {
+			setNetIPV4TCPTimestamp(t, oldTCPTS)
+		}
 	}
 }
 

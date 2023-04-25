@@ -88,7 +88,7 @@ func TestHTTPMonitorLoadWithIncompleteBuffers(t *testing.T) {
 				SlowResponse:       time.Millisecond * 500, // Half a second.
 				WriteTimeout:       time.Millisecond * 200,
 				ReadTimeout:        time.Millisecond * 200,
-				EnableTCPTimestamp: TCPTimestamp.value,
+				EnableTCPTimestamp: &TCPTimestamp.value,
 			})
 
 			fastSrvDoneFn := testutil.HTTPServer(t, fastServerAddr, testutil.Options{})
@@ -181,7 +181,7 @@ func TestHTTPMonitorIntegrationWithResponseBody(t *testing.T) {
 
 					srvDoneFn := testutil.HTTPServer(t, serverAddr, testutil.Options{
 						EnableKeepAlives:   true,
-						EnableTCPTimestamp: TCPTimestamp.value,
+						EnableTCPTimestamp: &TCPTimestamp.value,
 					})
 
 					requestFn := requestGenerator(t, targetAddr, bytes.Repeat([]byte("a"), tt.requestBodySize))
@@ -249,7 +249,7 @@ func TestHTTPMonitorIntegrationSlowResponse(t *testing.T) {
 						WriteTimeout:       serverTimeout,
 						ReadTimeout:        serverTimeout,
 						SlowResponse:       slowResponseTimeout,
-						EnableTCPTimestamp: TCPTimestamp.value,
+						EnableTCPTimestamp: &TCPTimestamp.value,
 					})
 
 					monitor := newHTTPMonitor(t)
@@ -288,13 +288,13 @@ func TestHTTPMonitorIntegration(t *testing.T) {
 			t.Run("with keep-alives", func(t *testing.T) {
 				testHTTPMonitor(t, targetAddr, serverAddr, 100, testutil.Options{
 					EnableKeepAlives:   true,
-					EnableTCPTimestamp: TCPTimestamp.value,
+					EnableTCPTimestamp: &TCPTimestamp.value,
 				})
 			})
 			t.Run("without keep-alives", func(t *testing.T) {
 				testHTTPMonitor(t, targetAddr, serverAddr, 100, testutil.Options{
 					EnableKeepAlives:   false,
-					EnableTCPTimestamp: TCPTimestamp.value,
+					EnableTCPTimestamp: &TCPTimestamp.value,
 				})
 			})
 		})
@@ -319,13 +319,13 @@ func TestHTTPMonitorIntegrationWithNAT(t *testing.T) {
 			t.Run("with keep-alives", func(t *testing.T) {
 				testHTTPMonitor(t, targetAddr, serverAddr, 100, testutil.Options{
 					EnableKeepAlives:   true,
-					EnableTCPTimestamp: TCPTimestamp.value,
+					EnableTCPTimestamp: &TCPTimestamp.value,
 				})
 			})
 			t.Run("without keep-alives", func(t *testing.T) {
 				testHTTPMonitor(t, targetAddr, serverAddr, 100, testutil.Options{
 					EnableKeepAlives:   false,
-					EnableTCPTimestamp: TCPTimestamp.value,
+					EnableTCPTimestamp: &TCPTimestamp.value,
 				})
 			})
 		})
@@ -347,7 +347,7 @@ func TestUnknownMethodRegression(t *testing.T) {
 			srvDoneFn := testutil.HTTPServer(t, serverAddr, testutil.Options{
 				EnableTLS:          false,
 				EnableKeepAlives:   true,
-				EnableTCPTimestamp: TCPTimestamp.value,
+				EnableTCPTimestamp: &TCPTimestamp.value,
 			})
 			defer srvDoneFn()
 
