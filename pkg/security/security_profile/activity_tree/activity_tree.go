@@ -159,14 +159,6 @@ func (at *ActivityTree) isEventValid(event *model.Event, shadowInsertion bool) (
 		return false, fmt.Errorf("event type not valid: %s", event.GetEventType())
 	}
 
-	// drop events with an error
-	if event.Error != nil {
-		if !shadowInsertion {
-			at.Stats.droppedCount[event.GetEventType()][eventTypeReason].Inc()
-		}
-		return false, fmt.Errorf("event error: %w", event.Error)
-	}
-
 	// event specific filtering
 	switch event.GetEventType() {
 	case model.BindEventType:
@@ -213,21 +205,17 @@ func (at *ActivityTree) insert(event *model.Event, shadowInsertion bool, generat
 	}
 
 	// find the node where the event should be inserted
-	entry, _ := event.FieldHandlers.ResolveProcessCacheEntry(event)
-	if entry == nil {
-		return false, fmt.Errorf("process cache entry not found")
-	}
-	if !entry.HasCompleteLineage() && !shadowInsertion { // check that the process context lineage is complete, otherwise drop it
+	if !event.ProcessCacheEntry.HasCompleteLineage() && !shadowInsertion { // check that the process context lineage is complete, otherwise drop it
 		at.Stats.droppedCount[event.GetEventType()][brokenLineageReason].Inc()
 		return false, fmt.Errorf("incomplete lineage")
 	}
 
-	node, newProcessNode, err := at.CreateProcessNode(entry, generationType, shadowInsertion)
-	if newProcessNode && shadowInsertion {
-		return true, nil
-	}
+	node, newProcessNode, err := at.CreateProcessNode(event.ProcessCacheEntry, generationType, shadowInsertion)
 	if err != nil {
 		return false, err
+	}
+	if newProcessNode && shadowInsertion {
+		return true, nil
 	}
 	if node == nil {
 		// a process node couldn't be found or created for this event, ignore it
@@ -236,6 +224,11 @@ func (at *ActivityTree) insert(event *model.Event, shadowInsertion bool, generat
 
 	// resolve fields
 	event.ResolveFieldsForAD()
+
+	// ignore events with an error
+	if event.Error != nil {
+		return
+	}
 
 	// the count of processed events is the count of events that matched the activity dump selector = the events for
 	// which we successfully found a process activity node
@@ -267,11 +260,6 @@ func (at *ActivityTree) CreateProcessNode(entry *model.ProcessCacheEntry, genera
 		return nil, false, nil
 	}
 
-	// drop processes with abnormal paths
-	if entry.GetPathResolutionError() != "" {
-		return nil, false, fmt.Errorf("process cache entry error: %s", entry.GetPathResolutionError())
-	}
-
 	// look for a ProcessActivityNode by process cookie
 	if entry.Cookie > 0 {
 		var found bool
@@ -291,7 +279,11 @@ func (at *ActivityTree) CreateProcessNode(entry *model.ProcessCacheEntry, genera
 	// find or create a ProcessActivityNode for the parent of the input ProcessCacheEntry. If the parent is a fork entry,
 	// jump immediately to the next ancestor.
 	parentNode, newProcessNode, err := at.CreateProcessNode(entry.GetNextAncestorBinary(), Snapshot, shadowInsertion)
-	if err != nil || newProcessNode && shadowInsertion {
+	if err != nil || (newProcessNode && shadowInsertion) {
+		// Explanation of (newProcessNode && shadowInsertion): when shadowInsertion is on, we can return as soon as we
+		// see something new in the tree. Although `newProcessNode` and `err` seem to be tied (i.e. newProcessNode is
+		// always false when err != nil), the important case is when err == nil, where newProcessNode can be either
+		// true or false.
 		return parentNode, newProcessNode, err
 	}
 
@@ -320,8 +312,8 @@ func (at *ActivityTree) CreateProcessNode(entry *model.ProcessCacheEntry, genera
 		}
 
 		// if it doesn't, create a new ProcessActivityNode for the input ProcessCacheEntry
-		node = NewProcessNode(entry, generationType)
 		if !shadowInsertion {
+			node = NewProcessNode(entry, generationType)
 			// insert in the list of root entries
 			at.ProcessNodes = append(at.ProcessNodes, node)
 			at.Stats.ProcessNodes++
@@ -339,8 +331,8 @@ func (at *ActivityTree) CreateProcessNode(entry *model.ProcessCacheEntry, genera
 		}
 
 		// if none of them matched, create a new ProcessActivityNode for the input processCacheEntry
-		node = NewProcessNode(entry, generationType)
 		if !shadowInsertion {
+			node = NewProcessNode(entry, generationType)
 			// insert in the list of children
 			parentNode.Children = append(parentNode.Children, node)
 			at.Stats.ProcessNodes++
