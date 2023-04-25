@@ -36,24 +36,27 @@ type Options struct {
 func getNetIPV4TCPTimestamp(t *testing.T) bool {
 	oldTCPTS, err := sysctl.Get("net.ipv4.tcp_timestamps")
 	if err != nil {
-		t.Fatal("can't get TCP timestamp", err)
+		t.Logf("can't get TCP timestamp %s", err)
 	}
 	return oldTCPTS == "1"
 }
 
-func setNetIPV4TCPTimestamp(t *testing.T, enable bool) error {
+func setNetIPV4TCPTimestamp(t *testing.T, enable bool) {
 	if os.Geteuid() != 0 {
 		if getNetIPV4TCPTimestamp(t) != enable {
 			t.Skip("skipping as we don't have enough permission to change net.ipv4.tcp_timestamps")
 		}
-		return nil
+		return
 	}
 
 	tcpTimestampStr := "0"
 	if enable {
 		tcpTimestampStr = "1"
 	}
-	return sysctl.Set("net.ipv4.tcp_timestamps", tcpTimestampStr)
+
+	if err := sysctl.Set("net.ipv4.tcp_timestamps", tcpTimestampStr); err != nil {
+		t.Logf("can't set old value of TCP timestamp %s", err)
+	}
 }
 
 // HTTPServer spins up a HTTP test server that returns the status code included in the URL
