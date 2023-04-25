@@ -4,6 +4,8 @@ github.com/DataDog/test-infra-definitions v0.0.0-20230417104538-c82a644470b0 h1:
 github.com/DataDog/test-infra-definitions v0.0.0-20230417104538-c82a644470b0/go.mod h1:0MnrW59lfUoXE8XxzXmWnmIJftg2rMYEG2qPRpvhDsI=
 github.com/DataDog/test-infra-definitions v0.0.0-20230425112218-d5425a487138 h1:PCl1nvx5yVeyIZmZhL2N6n2mYt5hAiFdW7zfK0rL2lA=
 github.com/DataDog/test-infra-definitions v0.0.0-20230425112218-d5425a487138/go.mod h1:0MnrW59lfUoXE8XxzXmWnmIJftg2rMYEG2qPRpvhDsI=
+github.com/DataDog/test-infra-definitions v0.0.0-20230425145020-b5cd6299342e h1:ZyQh9GTFotErFf0is8w1+LTeaE3GGh+8aXgz0sag7rI=
+github.com/DataDog/test-infra-definitions v0.0.0-20230425145020-b5cd6299342e/go.mod h1:0MnrW59lfUoXE8XxzXmWnmIJftg2rMYEG2qPRpvhDsI=
 github.com/HdrHistogram/hdrhistogram-go v1.1.2 h1:5IcZpTvzydCQeHzK4Ef/D5rrSqwxob0t8PQPMybUNFM=
 github.com/Masterminds/semver v1.5.0 h1:H65muMkzWKEuNDnfl9d70GUjFniHKHRbFPGBuZ3QEww=
 github.com/Masterminds/semver v1.5.0/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
