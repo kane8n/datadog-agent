@@ -42,6 +42,13 @@ func getNetIPV4TCPTimestamp(t *testing.T) bool {
 }
 
 func setNetIPV4TCPTimestamp(t *testing.T, enable bool) error {
+	if os.Geteuid() != 0 {
+		if getNetIPV4TCPTimestamp(t) != enable {
+			t.Skip("skipping as we don't have enough permission to change net.ipv4.tcp_timestamps")
+		}
+		return nil
+	}
+
 	tcpTimestampStr := "0"
 	if enable {
 		tcpTimestampStr = "1"
