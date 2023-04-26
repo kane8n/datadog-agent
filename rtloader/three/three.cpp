@@ -571,7 +571,7 @@ diagnoses_t *Three::getCheckDiagnoses(RtLoaderPyObject *check)
     // Calculate and allocate buffer size
     bufferSize = currentOffset = sizeof(diagnoses_t) + (numDiagnoses * sizeof(diagnosis_t));
     for (Py_ssize_t idx = 0; idx < numDiagnoses; idx++) {
-        PyObject* diagnosisObj = PyList_GetItem(diagnoses_list, idx); // borrowed ref
+        PyObject *diagnosisObj = PyList_GetItem(diagnoses_list, idx); // borrowed ref
         if (diagnosisObj == NULL) {
             setError("there was an error browsing 'diagnoses' list: " + _fetchPythonError());
             goto error;
@@ -594,7 +594,7 @@ diagnoses_t *Three::getCheckDiagnoses(RtLoaderPyObject *check)
     // Initialize header
     diagnoses->byteCout = bufferSize;
     diagnoses->diangosesCount = numDiagnoses;
-    diagnoses->diagnosesItems = (diagnosis_t*)((size_t)(void*)diagnoses + sizeof(diagnoses_t));
+    diagnoses->diagnosesItems = (diagnosis_t *)((size_t)(void *)diagnoses + sizeof(diagnoses_t));
 
     for (Py_ssize_t idx = 0; idx < numDiagnoses; idx++) {
         PyObject *diagnosisObj = PyList_GetItem(diagnoses_list, idx); // borrowed ref

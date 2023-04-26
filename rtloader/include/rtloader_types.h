@@ -103,7 +103,7 @@ typedef struct diagnosis_s {
 typedef struct diagnoses_s {
     size_t byteCout;
     size_t diangosesCount;
-    diagnosis_t* diagnosesItems;
+    diagnosis_t *diagnosesItems;
 } diagnoses_t;
 
 typedef struct py_info_s {

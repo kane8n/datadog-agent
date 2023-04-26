@@ -529,21 +529,21 @@ done:
     return warnings;
 }
 
-diagnoses_t* Two::getCheckDiagnoses(RtLoaderPyObject* check)
+diagnoses_t *Two::getCheckDiagnoses(RtLoaderPyObject *check)
 {
     if (check == NULL) {
         return NULL;
     }
 
-    PyObject* py_check = reinterpret_cast<PyObject*>(check);
-    diagnoses_t* diagnoses = NULL;
+    PyObject *py_check = reinterpret_cast<PyObject *>(check);
+    diagnoses_t *diagnoses = NULL;
     size_t bufferSize = 0;
     size_t currentOffset = 0;
 
     char func_name[] = "get_diagnoses";
     Py_ssize_t numDiagnoses;
 
-    PyObject* diagnoses_list = PyObject_CallMethod(py_check, func_name, NULL);
+    PyObject *diagnoses_list = PyObject_CallMethod(py_check, func_name, NULL);
     if (diagnoses_list == NULL) {
         goto done;
     }
@@ -563,7 +563,7 @@ diagnoses_t* Two::getCheckDiagnoses(RtLoaderPyObject* check)
     // Calculate and allocate buffer size
     bufferSize = currentOffset = sizeof(diagnoses_t) + (numDiagnoses * sizeof(diagnosis_t));
     for (Py_ssize_t idx = 0; idx < numDiagnoses; idx++) {
-        PyObject* diagnosisObj = PyList_GetItem(diagnoses_list, idx); // borrowed ref
+        PyObject *diagnosisObj = PyList_GetItem(diagnoses_list, idx); // borrowed ref
         if (diagnosisObj == NULL) {
             setError("there was an error browsing 'diagnoses' list: " + _fetchPythonError());
             goto error;
@@ -576,7 +576,7 @@ diagnoses_t* Two::getCheckDiagnoses(RtLoaderPyObject* check)
         bufferSize += attr_as_string_size(diagnosisObj, "remediation");
         bufferSize += attr_as_string_size(diagnosisObj, "raw_error");
     }
-    diagnoses = (diagnoses_t*)_malloc(bufferSize);
+    diagnoses = (diagnoses_t *)_malloc(bufferSize);
     if (!diagnoses) {
         setError("could not allocate memory to store diagnoses");
         goto done;
@@ -586,16 +586,16 @@ diagnoses_t* Two::getCheckDiagnoses(RtLoaderPyObject* check)
     // Initialize header
     diagnoses->byteCout = bufferSize;
     diagnoses->diangosesCount = numDiagnoses;
-    diagnoses->diagnosesItems = (diagnosis_t*)((size_t)(void*)diagnoses + sizeof(diagnoses_t));
+    diagnoses->diagnosesItems = (diagnosis_t *)((size_t)(void *)diagnoses + sizeof(diagnoses_t));
 
     for (Py_ssize_t idx = 0; idx < numDiagnoses; idx++) {
-        PyObject* diagnosisObj = PyList_GetItem(diagnoses_list, idx); // borrowed ref
+        PyObject *diagnosisObj = PyList_GetItem(diagnoses_list, idx); // borrowed ref
         if (diagnosisObj == NULL) {
             setError("there was an error browsing 'diagnoses' list: " + _fetchPythonError());
             goto error;
         }
         size_t copiedSize = 0;
-        diagnosis_t* diagnosis = diagnoses->diagnosesItems + idx;
+        diagnosis_t *diagnosis = diagnoses->diagnosesItems + idx;
 
         // result
         diagnosis->result = (size_t)attr_as_long(diagnosisObj, "result");
