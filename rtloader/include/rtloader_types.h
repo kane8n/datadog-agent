@@ -83,9 +83,11 @@ typedef enum {
     DATADOG_AGENT_RTLOADER_DIAGNOSIS_UNEXPECTED_ERROR = 4,
 } DiagnosisResult;
 
+// All pointers point to portion of memory contained completely within diagnoses_t buffer
+// size_t or pointers are needed to avoid Go vs. CGO misalignments
 typedef struct diagnosis_s {
     // required fields
-    DiagnosisResult result;
+    size_t result;
     char *name;
     char *diagnosis;
 
@@ -95,6 +97,14 @@ typedef struct diagnosis_s {
     char *remediation;
     char *raw_error;
 } diagnosis_t;
+
+// Self-contained array of diagnosis. All pointers point to portion of memory contained
+// completely within the diagnoses_t buffer. size_t or pointers are needed to avoid Go vs. CGO misalignments
+typedef struct diagnoses_s {
+    size_t byteCout;
+    size_t diangosesCount;
+    diagnosis_t* diagnosesItems;
+} diagnoses_t;
 
 typedef struct py_info_s {
     const char *version; // returned by Py_GetInfo(); is static string owned by python

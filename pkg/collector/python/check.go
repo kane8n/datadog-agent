@@ -34,7 +34,7 @@ import (
 #include "rtloader_mem.h"
 
 char *getStringAddr(char **array, unsigned int idx);
-diagnosis_t *getDiagnosisAddr(diagnosis_t **array, unsigned int idx);
+diagnosis_t *getDiagnosisAddr(diagnoses_t *diagnoses, unsigned int idx);
 */
 import "C"
 
@@ -369,18 +369,24 @@ func (c *PythonCheck) GetDiagnoses() ([]diagnosis.Diagnosis, error) {
 		d.Result = diagnosis.DiagnosisResult(diagnosisPtr.result)
 		if diagnosisPtr.raw_error != nil {
 			d.RawError = errors.New(C.GoString(diagnosisPtr.raw_error))
-			C.rtloader_free(rtloader, unsafe.Pointer(diagnosisPtr.raw_error))
 		}
 
-		// Convert and free string fields
-		convertAndFreeCString(diagnosisPtr.name, &d.Name)
-		convertAndFreeCString(diagnosisPtr.diagnosis, &d.Diagnosis)
-		convertAndFreeCString(diagnosisPtr.category, &d.Category)
-		convertAndFreeCString(diagnosisPtr.description, &d.Description)
-		convertAndFreeCString(diagnosisPtr.remediation, &d.Remediation)
-
-		// free diagnosis_t* entry
-		C.rtloader_free(rtloader, unsafe.Pointer(diagnosisPtr))
+		// Convert string fields
+		if diagnosisPtr.name != nil {
+			d.Name = C.GoString(diagnosisPtr.name)
+		}
+		if diagnosisPtr.diagnosis != nil {
+			d.Diagnosis = C.GoString(diagnosisPtr.diagnosis)
+		}
+		if diagnosisPtr.category != nil {
+			d.Category = C.GoString(diagnosisPtr.category)
+		}
+		if diagnosisPtr.description != nil {
+			d.Description = C.GoString(diagnosisPtr.description)
+		}
+		if diagnosisPtr.remediation != nil {
+			d.Remediation = C.GoString(diagnosisPtr.remediation)
+		}
 
 		// Extra validation diagnosis for consistency. Checked required fields and status range
 		if d.Result < diagnosis.DiagnosisResultMIN ||

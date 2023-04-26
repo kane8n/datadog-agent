@@ -245,9 +245,3 @@ func SetPythonPsutilProcPath(procPath string) error {
 	return getRtLoaderError()
 }
 
-func convertAndFreeCString(cgoStr *C.char, goStr *string) {
-	if cgoStr != nil {
-		*goStr = C.GoString(cgoStr)
-		C.rtloader_free(rtloader, unsafe.Pointer(cgoStr))
-	}
-}

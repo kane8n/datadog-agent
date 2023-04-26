@@ -93,12 +93,13 @@ func diagnose(diagCfg diagnosis.DiagnoseConfig) []diagnosis.Diagnosis {
 		checkName := diagnoseConfig.Name
 		instances := collector.GetChecksByNameForConfigs(checkName, diagnoseConfigs)
 		for _, instance := range instances {
-			// Run twice if the check is using rate metrics
-			_ = instance.Run()
-			runErr := instance.Run()
 
 			defaultDiagnosisName := fmt.Sprintf("Check: %s [%s]", checkName, string(instance.ID()))
 
+			// Run check
+			runErr := instance.Run()
+
+			// Get diagnoses
 			checkDiagnoses, diagnoseErr := instance.GetDiagnoses()
 			if diagnoseErr == nil && len(checkDiagnoses) > 0 {
 				// Check has explicit Diagnoses and return them
@@ -111,26 +112,6 @@ func diagnose(diagCfg diagnosis.DiagnoseConfig) []diagnosis.Diagnosis {
 					Diagnosis: "Check Dianose failes with unexpected errors",
 					RawError:  runErr,
 				})
-			} else {
-				// No diangoses reported but if verbose has been specified report
-				// results of check run as diagnosis
-				if diagCfg.Verbose {
-					// For verbose
-					if runErr == nil {
-						diagnoses = append(diagnoses, diagnosis.Diagnosis{
-							Result:    diagnosis.DiagnosisSuccess,
-							Name:      defaultDiagnosisName,
-							Diagnosis: "Check run successfully",
-						})
-					} else {
-						diagnoses = append(diagnoses, diagnosis.Diagnosis{
-							Result:    diagnosis.DiagnosisFail,
-							Name:      defaultDiagnosisName,
-							Diagnosis: "Check run failed",
-							RawError:  runErr,
-						})
-					}
-				}
 			}
 		}
 	}
