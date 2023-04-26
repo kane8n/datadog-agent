@@ -244,4 +244,3 @@ func SetPythonPsutilProcPath(procPath string) error {
 	C.set_module_attr_string(rtloader, module, attrName, attrValue)
 	return getRtLoaderError()
 }
-
