@@ -29,6 +29,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	netlink "github.com/DataDog/datadog-agent/pkg/network/netlink/testutil"
 	"github.com/DataDog/datadog-agent/pkg/network/protocols/http/testutil"
+	libtelemetry "github.com/DataDog/datadog-agent/pkg/network/protocols/telemetry"
 )
 
 const (
@@ -360,27 +361,35 @@ func TestUnknownMethodRegression(t *testing.T) {
 				requestFn()
 			}
 
-			time.Sleep(2 * time.Second)
+			// give time to collect/aggregate
+			time.Sleep(3 * time.Second)
 			stats := monitor.GetHTTPStats()
+			telemetry := monitor.httpTelemetry
+			hits1XX := telemetry.hits1XX.Get()
+			totalHits := telemetry.totalHits.Get()
+			dropped := telemetry.dropped.Get()
+			rejected := telemetry.rejected.Get()
+			malformed := telemetry.malformed.Get()
+			aggregations := telemetry.aggregations.Get()
 
 			nonDstPortRequests := int64(0)
 			for key := range stats {
 				if key.DstPort != 8080 {
 					nonDstPortRequests++
+					continue
 				}
 				if key.Method == MethodUnknown {
 					t.Error("detected HTTP request with method unknown")
 				}
 			}
 
-			telemetry := monitor.httpTelemetry
-			require.Equal(t, int64(0), telemetry.dropped.Get())
-			require.Equal(t, int64(0), telemetry.rejected.Get())
-			require.Equal(t, int64(0), telemetry.malformed.Get())
+			require.Equal(t, int64(0), dropped)
+			require.Equal(t, int64(0), rejected)
+			require.Equal(t, int64(0), malformed)
 			// requestGenerator() doesn't query 100 responses
-			require.Equal(t, int64(0), telemetry.hits1XX.Get())
+			require.Equal(t, int64(0), hits1XX)
 
-			requestsSum := telemetry.totalHits.Get()
+			requestsSum := totalHits - aggregations
 			require.Equal(t, int64(100), requestsSum-nonDstPortRequests)
 		})
 	}
@@ -647,7 +656,10 @@ func newHTTPMonitor(t *testing.T) *Monitor {
 	monitor, err := NewMonitor(cfg, nil, nil, nil)
 	skipIfNotSupported(t, err)
 	require.NoError(t, err)
-	t.Cleanup(monitor.Stop)
+	t.Cleanup(func() {
+		monitor.Stop()
+		libtelemetry.Clear()
+	})
 
 	// at this stage the test can be legitimally skipped due to missing BTF information
 	// in the context of CO-RE
