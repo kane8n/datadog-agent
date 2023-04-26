@@ -8,11 +8,10 @@
 #include "rtloader_types.h"
 #include "stringutils.h"
 
-
-PyObject * yload = NULL;
-PyObject * ydump = NULL;
-PyObject * loader = NULL;
-PyObject * dumper = NULL;
+PyObject *yload = NULL;
+PyObject *ydump = NULL;
+PyObject *loader = NULL;
+PyObject *dumper = NULL;
 
 /**
  * returns a C (NULL terminated UTF-8) string from a python string.
@@ -23,9 +22,10 @@ PyObject * dumper = NULL;
  *  The returned pointer is embedded witin PyObject. When string pointer
  *  is not needed corresponding PyObject reference needs to be decremented
  */
-char* as_embedded_string(PyObject* object, PyObject** stringObject) {
-    char* retval = NULL;
-    PyObject* temp_bytes = NULL;
+char *as_embedded_string(PyObject *object, PyObject **stringObject)
+{
+    char *retval = NULL;
+    PyObject *temp_bytes = NULL;
     if (object == NULL) {
         return NULL;
     }
@@ -36,7 +36,7 @@ char* as_embedded_string(PyObject* object, PyObject** stringObject) {
         return NULL;
     }
 
-    char* tmp = PyString_AsString(object);
+    char *tmp = PyString_AsString(object);
     if (tmp == NULL) {
         // PyString_AsString might raise an error when python can't encode a
         // unicode string to byte
@@ -53,8 +53,7 @@ char* as_embedded_string(PyObject* object, PyObject** stringObject) {
         // We already have an encoded string, we suppose it has the correct encoding (UTF-8)
         temp_bytes = object;
         Py_INCREF(temp_bytes);
-    }
-    else if (PyUnicode_Check(object)) {
+    } else if (PyUnicode_Check(object)) {
         // Encode the Unicode string that was given
         temp_bytes = PyUnicode_AsEncodedString(object, "UTF-8", "strict");
         if (temp_bytes == NULL) {
@@ -63,8 +62,7 @@ char* as_embedded_string(PyObject* object, PyObject** stringObject) {
             PyErr_Clear();
             return NULL;
         }
-    }
-    else {
+    } else {
         return NULL;
     }
 
@@ -84,10 +82,11 @@ char* as_embedded_string(PyObject* object, PyObject** stringObject) {
  *  The returned pointer is allocated from the heap and must be
  * deallocated (free()ed) by the caller
  */
-char *as_string(PyObject *object) {
-    PyObject* temp_bytes = NULL;
-    char* retval = NULL;
-    char* tmp = NULL;
+char *as_string(PyObject *object)
+{
+    PyObject *temp_bytes = NULL;
+    char *retval = NULL;
+    char *tmp = NULL;
 
     if (object == NULL) {
         return NULL;
@@ -102,22 +101,21 @@ char *as_string(PyObject *object) {
     return retval;
 }
 
-char* attr_as_embedded_string(PyObject* object, const char* attributeName, PyObject** stringObject) {
+char *attr_as_embedded_string(PyObject *object, const char *attributeName, PyObject **stringObject)
+{
     if (object == NULL) {
         return NULL;
     }
 
-    char* value = NULL;
-    PyObject* py_attr = NULL;
+    char *value = NULL;
+    PyObject *py_attr = NULL;
 
     py_attr = PyObject_GetAttrString(object, attributeName);
     if (py_attr != NULL && PyUnicode_Check(py_attr)) {
         value = as_embedded_string(py_attr, stringObject);
-    }
-    else if (py_attr != NULL && !PyUnicode_Check(py_attr)) {
+    } else if (py_attr != NULL && !PyUnicode_Check(py_attr)) {
         PyErr_Clear();
-    }
-    else {
+    } else {
         PyErr_Clear();
     }
 
@@ -126,13 +124,14 @@ char* attr_as_embedded_string(PyObject* object, const char* attributeName, PyObj
     return value;
 }
 
-long attr_as_long(PyObject* object, const char* attributeName) {
+long attr_as_long(PyObject *object, const char *attributeName)
+{
     if (object == NULL) {
         return -1;
     }
 
     long value = -1;
-    PyObject* py_attr = NULL;
+    PyObject *py_attr = NULL;
 
     py_attr = PyObject_GetAttrString(object, attributeName);
     if (py_attr != NULL) {
@@ -144,27 +143,26 @@ long attr_as_long(PyObject* object, const char* attributeName) {
     return value;
 }
 
-size_t attr_as_string_size(PyObject* object, const char* attributeName) {
-    PyObject* temp_bytes = NULL;
-    char* tmp = NULL;
+size_t attr_as_string_size(PyObject *object, const char *attributeName)
+{
+    PyObject *temp_bytes = NULL;
+    char *tmp = NULL;
     size_t size = 0;
 
     if (object == NULL) {
         return 0;
     }
 
-    PyObject* py_attr = PyObject_GetAttrString(object, attributeName);
+    PyObject *py_attr = PyObject_GetAttrString(object, attributeName);
     if (py_attr != NULL && PyUnicode_Check(py_attr)) {
         tmp = as_embedded_string(py_attr, &temp_bytes);
         if (tmp != NULL && temp_bytes != NULL) {
             size = strlen(tmp) + 1;
             Py_XDECREF(temp_bytes);
         }
-    }
-    else if (py_attr != NULL && !PyUnicode_Check(py_attr)) {
+    } else if (py_attr != NULL && !PyUnicode_Check(py_attr)) {
         PyErr_Clear();
-    }
-    else {
+    } else {
         PyErr_Clear();
     }
 
@@ -173,16 +171,17 @@ size_t attr_as_string_size(PyObject* object, const char* attributeName) {
     return size;
 }
 
-size_t copy_attr_as_string(PyObject* object, const char* attributeName, char* buffer, size_t bufferLength) {
-    PyObject* temp_bytes = NULL;
-    char* tmp = NULL;
+size_t copy_attr_as_string(PyObject *object, const char *attributeName, char *buffer, size_t bufferLength)
+{
+    PyObject *temp_bytes = NULL;
+    char *tmp = NULL;
     size_t size = 0;
 
     if (object == NULL) {
         return 0;
     }
 
-    PyObject* py_attr = PyObject_GetAttrString(object, attributeName);
+    PyObject *py_attr = PyObject_GetAttrString(object, attributeName);
     if (py_attr != NULL && PyUnicode_Check(py_attr)) {
         tmp = as_embedded_string(py_attr, &temp_bytes);
         if (tmp != NULL && temp_bytes != NULL) {
@@ -192,11 +191,9 @@ size_t copy_attr_as_string(PyObject* object, const char* attributeName, char* bu
             }
             Py_XDECREF(temp_bytes);
         }
-    }
-    else if (py_attr != NULL && !PyUnicode_Check(py_attr)) {
+    } else if (py_attr != NULL && !PyUnicode_Check(py_attr)) {
         PyErr_Clear();
-    }
-    else {
+    } else {
         PyErr_Clear();
     }
 
@@ -205,21 +202,25 @@ size_t copy_attr_as_string(PyObject* object, const char* attributeName, char* bu
     return size;
 }
 
-char* string_buf_from_offset(void* buf, size_t offset) {
-    return (char*)(((size_t)(void*)buf) + offset);
+char *string_buf_from_offset(void *buf, size_t offset)
+{
+    return (char *)(((size_t)(void *)buf) + offset);
 }
 
-size_t string_buf_from_offset_len(size_t bufLength, size_t offset) {
+size_t string_buf_from_offset_len(size_t bufLength, size_t offset)
+{
     return bufLength > offset ? bufLength - offset : 0;
 }
 
-size_t copy_attr_as_string_at(PyObject* object, const char* attributeName, void* buf, size_t bufOffset, size_t bufLength) {
-    return copy_attr_as_string(object, attributeName,
-        string_buf_from_offset(buf, bufOffset),
-        string_buf_from_offset_len(bufLength, bufOffset));
+size_t copy_attr_as_string_at(PyObject *object, const char *attributeName, void *buf, size_t bufOffset,
+                              size_t bufLength)
+{
+    return copy_attr_as_string(object, attributeName, string_buf_from_offset(buf, bufOffset),
+                               string_buf_from_offset_len(bufLength, bufOffset));
 }
 
-int init_stringutils(void) {
+int init_stringutils(void)
+{
     PyObject *yaml = NULL;
     int ret = EXIT_FAILURE;
 
@@ -273,7 +274,8 @@ done:
     return ret;
 }
 
-PyObject *from_yaml(const char *data) {
+PyObject *from_yaml(const char *data)
+{
     PyObject *args = NULL;
     PyObject *kwargs = NULL;
     PyObject *retval = NULL;
@@ -301,7 +303,8 @@ done:
     return retval;
 }
 
-char *as_yaml(PyObject *object) {
+char *as_yaml(PyObject *object)
+{
     char *retval = NULL;
     PyObject *dumped = NULL;
 
@@ -315,7 +318,7 @@ char *as_yaml(PyObject *object) {
     retval = as_string(dumped);
 
 done:
-    //Py_XDECREF can accept (and ignore) NULL references
+    // Py_XDECREF can accept (and ignore) NULL references
     Py_XDECREF(dumped);
     Py_XDECREF(kwargs);
     Py_XDECREF(args);
