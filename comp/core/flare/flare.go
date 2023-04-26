@@ -54,7 +54,7 @@ func (f *flare) Send(flarePath string, caseID string, email string) (string, err
 	return helpers.SendTo(flarePath, caseID, email, f.config.GetString("api_key"), utils.GetInfraEndpoint(f.config))
 }
 
-// Create create a new flare and returns the path to the final archive file.
+// Create creates a new flare and returns the path to the final archive file.
 func (f *flare) Create(pdata ProfileData, ipcError error) (string, error) {
 	fb, err := helpers.NewFlareBuilder(f.params.local)
 	if err != nil {
