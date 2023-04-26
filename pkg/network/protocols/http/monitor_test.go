@@ -333,6 +333,9 @@ func TestHTTPMonitorIntegrationWithNAT(t *testing.T) {
 }
 
 func TestUnknownMethodRegression(t *testing.T) {
+	// SetupDNAT sets up a NAT translation from 2.2.2.2 to 1.1.1.1
+	netlink.SetupDNAT(t)
+
 	for _, TCPTimestamp := range []struct {
 		name  string
 		value bool
@@ -340,8 +343,9 @@ func TestUnknownMethodRegression(t *testing.T) {
 		{name: "without TCP timestamp option", value: false},
 		{name: "with TCP timestamp option", value: true},
 	} {
-
 		t.Run(TCPTimestamp.name, func(t *testing.T) {
+			monitor := newHTTPMonitor(t)
+
 			targetAddr := "2.2.2.2:8080"
 			serverAddr := "1.1.1.1:8080"
 			srvDoneFn := testutil.HTTPServer(t, serverAddr, testutil.Options{
@@ -350,10 +354,6 @@ func TestUnknownMethodRegression(t *testing.T) {
 				EnableTCPTimestamp: &TCPTimestamp.value,
 			})
 			defer srvDoneFn()
-
-			monitor := newHTTPMonitor(t)
-			// SetupDNAT sets up a NAT translation from 2.2.2.2 to 1.1.1.1
-			netlink.SetupDNAT(t)
 
 			requestFn := requestGenerator(t, targetAddr, emptyBody)
 			for i := 0; i < 100; i++ {
