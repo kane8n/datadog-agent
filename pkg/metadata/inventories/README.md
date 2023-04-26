@@ -139,9 +139,13 @@ The payload is a JSON dict with the following fields
     Values on AWS:
     - `IMDSv2`: The Agent successfully contacted IMDSv2 metadata endpoint.
     - `IMDSv1`: The Agent successfully contacted IMDSv1 metadata endpoint.
-    - `DMI`: The Agent successfully used DMI information to fetch the instance ID (only work on EC2 Nitro instances).
+    - `DMI`: The Agent successfully used DMI information to fetch the instance ID (only works on Unix EC2 Nitro instances).
     - `UUID`: The hypervisor or product UUID has the EC2 prefix. The Agent knows it's running on EC2 but don't know on
-      which instance.
+      which instance (see `hypervisor_guest_uuid` or `dmi_product_uuid`).
+  - `cloud_provider_id` - **string**: the unique ID the cloud provider uses to reference this instance.
+    This is different for each cloud provider (for now, ony AWS is supported).
+    - On AWS: the instance ID returned by querying the IMDSv2 endpoint. An empty string is returned if we can't reach
+      IMDSv2 (even if IMDSv1 is available).
   - `hypervisor_guest_uuid` - **string**: the hypervisor guest UUID (Unix only, empty string on Windows or if we can't
     read the data). On `ec2` instance this might start by "ec2". This was introduce in `7.41.0`/`6.41.0`.
   - `dmi_product_uuid` - **string**: the DMI product UUID (Unix only, empty string on Windows or if we can't read the
