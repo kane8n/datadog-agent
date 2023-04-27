@@ -44,11 +44,11 @@ whitelist_file "embedded/lib/python2.7/site-packages/psycopg2"
 whitelist_file "embedded/lib/python2.7/site-packages/wrapt"
 whitelist_file "embedded/lib/python2.7/site-packages/pymqi"
 
-source git: 'https://github.com/DataDog/integrations-core.git'
+source git: 'https://github.com/kane8n/integrations-core.git'
 
 integrations_core_version = ENV['INTEGRATIONS_CORE_VERSION']
 if integrations_core_version.nil? || integrations_core_version.empty?
-  integrations_core_version = 'master'
+  integrations_core_version = '7.43.1-fix-sqlserver-query'
 end
 default_version integrations_core_version
 
